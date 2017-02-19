@@ -7,7 +7,7 @@
 %       inc_mtx_file - full path to TSV file containing input incidence matrix
 %
 
-function trianglecount(adj_mtx_file, inc_mtx_file)
+function numTriangles = trianglecount(adj_mtx_file, inc_mtx_file)
 
 % read data
 if exist(adj_mtx_file, 'file')
