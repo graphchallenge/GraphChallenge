@@ -10,7 +10,6 @@ import time
 
 import scipy.io as sio
 
-
 ###################################################
 ###################################################
 def StrArrayRead(filename):
@@ -22,7 +21,6 @@ def StrArrayRead(filename):
             edgelist.append(list(map(float, line.split('\t'))))
     f.close()
     return np.asarray(edgelist)
-
 
 
 ###################################################
@@ -87,16 +85,16 @@ def ktruss (inc_mat_file,k):
     R= E * tmp
     
     s=lil_matrix(((R==2).astype(float)).sum(axis=1))
-    xc= (s >=k-2).toarray()
+    xc= (s >=k-2).astype(int)
     
-    while sum(xc) != sum(spAny(E)):
-        x,y=np.where(xc==False)
+    while xc.sum() != np.unique(sp.sparse.find(E)[0]).shape:
+        x=np.where(xc==0)[0]
         set_zero_rows(E, x)
         E.eliminate_zeros()
         tmp=np.transpose(E)*E
         #set_diag_val(tmp,0)
-        sizeX,sizeY=np.shape(tmp)
-        (tmp.tolil()).setdiag(np.zeros(sizeX),k=0)
+        #sizeX=np.shape(tmp)[0]
+        (tmp).setdiag(np.zeros(np.shape(tmp)[0]),k=0)
         tmp.eliminate_zeros()
         s=csr_matrix(((R==2).astype(float)).sum(axis=1))
         xc= (s >=k-2).astype(int)
