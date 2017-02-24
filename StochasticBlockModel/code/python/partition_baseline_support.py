@@ -8,7 +8,6 @@
                Physical review letters 110, no. 14 (2013): 148701.
         .. [3] Karrer, Brian, and Mark EJ Newman. 'Stochastic blockmodels and community structure in networks.'
                Physical Review E 83, no. 1 (2011): 016107."""
-
 import pandas as pd
 import numpy as np
 from scipy import sparse as sparse
@@ -17,6 +16,7 @@ from munkres import Munkres # for correctness evaluation
 use_graph_tool_options = False # for visualiziing graph partitions (optional)
 if use_graph_tool_options:
     import graph_tool.all as gt
+
 
 def load_graph(input_filename, true_partition_available):
     """Load the graph from a TSV file with standard format, and the truth partition if available
@@ -72,7 +72,7 @@ def load_graph(input_filename, true_partition_available):
 
     # find number of nodes and edges
     N = len(out_neighbors)
-    E = sum([len(v) for v in out_neighbors])
+    E = sum(len(v) for v in out_neighbors)
 
     if true_partition_available:
         true_b = np.zeros(len(out_neighbors), dtype=int)
@@ -85,6 +85,7 @@ def load_graph(input_filename, true_partition_available):
         return out_neighbors, in_neighbors, N, E, true_b
     else:
         return out_neighbors, in_neighbors, N, E
+
 
 def initialize_partition_variables():
     """Initialize variables for the iterations to find the best partition with the optimal number of blocks
@@ -111,15 +112,16 @@ def initialize_partition_variables():
                     empty for now and will store the graph object if graphs will be visualized"""
 
     optimal_B_found = False
-    old_b = [[],[],[]] # partition for the high, best, and low number of blocks so far
-    old_M = [[],[],[]] # edge count matrix for the high, best, and low number of blocks so far
-    old_d = [[],[],[]] # block degrees for the high, best, and low number of blocks so far
-    old_d_out = [[],[],[]] # out block degrees for the high, best, and low number of blocks so far
-    old_d_in = [[],[],[]] # in block degrees for the high, best, and low number of blocks so far
+    old_b = [[], [], []]  # partition for the high, best, and low number of blocks so far
+    old_M = [[], [], []]  # edge count matrix for the high, best, and low number of blocks so far
+    old_d = [[], [], []]  # block degrees for the high, best, and low number of blocks so far
+    old_d_out = [[], [], []]  # out block degrees for the high, best, and low number of blocks so far
+    old_d_in = [[], [], []]  # in block degrees for the high, best, and low number of blocks so far
     old_S = [np.Inf, np.Inf, np.Inf] # overall entropy for the high, best, and low number of blocks so far
-    old_B = [[], [], []] # number of blocks for the high, best, and low number of blocks so far
+    old_B = [[], [], []]  # number of blocks for the high, best, and low number of blocks so far
     graph_object = []
     return optimal_B_found, old_b, old_M, old_d, old_d_out, old_d_in, old_S, old_B, graph_object
+
 
 def initialize_edge_counts(out_neighbors, B, b, use_sparse):
     """Initialize the edge count matrix and block degrees according to the current partition
@@ -152,20 +154,21 @@ def initialize_edge_counts(out_neighbors, B, b, use_sparse):
         Compute the edge count matrix and the block degrees from scratch"""
 
     if use_sparse: # store interblock edge counts as a sparse matrix
-        M = sparse.lil_matrix((B,B), dtype=int)
+        M = sparse.lil_matrix((B, B), dtype=int)
     else:
-        M = np.zeros((B,B), dtype=int)
+        M = np.zeros((B, B), dtype=int)
     # compute the initial interblock edge count
     for v in range(len(out_neighbors)):
         k1 = b[v]
-        k2, inverse_idx = np.unique(b[out_neighbors[v][:,0]], return_inverse = True)
-        count = np.bincount(inverse_idx, weights=out_neighbors[v][:,1]).astype(int)
-        M[k1,k2] = M[k1,k2] + count
+        k2, inverse_idx = np.unique(b[out_neighbors[v][:, 0]], return_inverse=True)
+        count = np.bincount(inverse_idx, weights=out_neighbors[v][:, 1]).astype(int)
+        M[k1, k2] += count
     # compute initial block degrees
     d_out = np.asarray(M.sum(axis=1)).ravel()
     d_in = np.asarray(M.sum(axis=0)).ravel()
     d = d_out + d_in
     return M, d_out, d_in, d
+
 
 def propose_new_partition(r, neighbors_out, neighbors_in, b, M, d, B, agg_move, use_sparse):
     """Propose a new block assignment for the current node or block
@@ -217,21 +220,21 @@ def propose_new_partition(r, neighbors_out, neighbors_in, b, M, d, B, agg_move, 
     rand_neighbor = np.random.choice(neighbors[:,0], p=neighbors[:,1]/float(k))
     u = b[rand_neighbor]
     # propose a new block randomly
-    if (np.random.uniform() <= B/float(d[u]+B)): # chance inversely prop. to block_degree
-        if agg_move: # force proposal to be different from current block
+    if np.random.uniform() <= B/float(d[u]+B):  # chance inversely prop. to block_degree
+        if agg_move:  # force proposal to be different from current block
             candidates = set(range(B))
             candidates.discard(r)
             s = np.random.choice(list(candidates))
         else:
             s = np.random.randint(B)
-    else: # propose by random draw from neighbors of block partition[rand_neighbor]
+    else:  # propose by random draw from neighbors of block partition[rand_neighbor]
         if use_sparse:
-            multinomial_prob = (M[u,:].toarray().transpose() + M[:,u].toarray()) / float(d[u])
+            multinomial_prob = (M[u, :].toarray().transpose() + M[:, u].toarray()) / float(d[u])
         else:
-            multinomial_prob = (M[u,:].transpose() + M[:,u]) / float(d[u])
-        if agg_move: # force proposal to be different from current block
+            multinomial_prob = (M[u, :].transpose() + M[:, u]) / float(d[u])
+        if agg_move:  # force proposal to be different from current block
             multinomial_prob[r] = 0
-            if (multinomial_prob.sum()==0): # the current block has no neighbors. randomly propose a different block
+            if multinomial_prob.sum() == 0:  # the current block has no neighbors. randomly propose a different block
                 candidates = set(range(B))
                 candidates.discard(r)
                 s = np.random.choice(list(candidates))
@@ -240,10 +243,11 @@ def propose_new_partition(r, neighbors_out, neighbors_in, b, M, d, B, agg_move, 
                 multinomial_prob = multinomial_prob / multinomial_prob.sum()
         candidates = multinomial_prob.nonzero()[0]
         s = candidates[np.flatnonzero(np.random.multinomial(1, multinomial_prob[candidates].ravel()))[0]]
-
     return s, k_out, k_in, k
 
-def compute_new_rows_cols_interblock_edge_count_matrix(M, r, s, b_out, count_out, b_in, count_in, count_self, agg_move, use_sparse):
+
+def compute_new_rows_cols_interblock_edge_count_matrix(M, r, s, b_out, count_out, b_in, count_in, count_self,
+                                                       agg_move, use_sparse):
     """Compute the two new rows and cols of the edge count matrix under the proposal for the current node or block
 
         Parameters
@@ -285,43 +289,44 @@ def compute_new_rows_cols_interblock_edge_count_matrix(M, r, s, b_out, count_out
         The updates only involve changing the entries to and from the neighboring blocks"""
 
     B = M.shape[0]
-    if agg_move: # the r row and column are simply empty after this merge move
+    if agg_move:  # the r row and column are simply empty after this merge move
         if use_sparse:
             M_r_row = sparse.lil_matrix(M[r, :].shape, dtype=int)
             M_r_col = sparse.lil_matrix(M[:, r].shape, dtype=int)
         else:
-            M_r_row = np.zeros((1,B), dtype=int)
-            M_r_col = np.zeros((B,1), dtype=int)
+            M_r_row = np.zeros((1, B), dtype=int)
+            M_r_col = np.zeros((B, 1), dtype=int)
     else:
         if use_sparse:
             M_r_row = M[r, :].copy()
             M_r_col = M[:, r].copy()
         else:
-            M_r_row = M[r, :].copy().reshape(1,B)
-            M_r_col = M[:, r].copy().reshape(B,1)
-        M_r_row[0,b_out] -= count_out
-        M_r_row[0,r] -= np.sum(count_in[np.where(b_in==r)])
-        M_r_row[0,s] += np.sum(count_in[np.where(b_in==r)])
-        M_r_col[b_in,0] -= count_in.reshape(M_r_col[b_in,0].shape)
-        M_r_col[r,0] -= np.sum(count_out[np.where(b_out==r)])
-        M_r_col[s,0] += np.sum(count_out[np.where(b_out==r)])
+            M_r_row = M[r, :].copy().reshape(1, B)
+            M_r_col = M[:, r].copy().reshape(B, 1)
+        M_r_row[0, b_out] -= count_out
+        M_r_row[0, r] -= np.sum(count_in[np.where(b_in == r)])
+        M_r_row[0, s] += np.sum(count_in[np.where(b_in == r)])
+        M_r_col[b_in, 0] -= count_in.reshape(M_r_col[b_in, 0].shape)
+        M_r_col[r, 0] -= np.sum(count_out[np.where(b_out == r)])
+        M_r_col[s, 0] += np.sum(count_out[np.where(b_out == r)])
     if use_sparse:
         M_s_row = M[s, :].copy()
         M_s_col = M[:, s].copy()
     else:
-        M_s_row = M[s, :].copy().reshape(1,B)
-        M_s_col = M[:, s].copy().reshape(B,1)
-    M_s_row[0,b_out] += count_out
-    M_s_row[0,r] -= np.sum(count_in[np.where(b_in==s)])
-    M_s_row[0,s] += np.sum(count_in[np.where(b_in==s)])
-    M_s_row[0,r] -= count_self
-    M_s_row[0,s] += count_self
-    M_s_col[b_in,0] += count_in.reshape(M_s_col[b_in,0].shape)
-    M_s_col[r,0] -= np.sum(count_out[np.where(b_out==s)])
-    M_s_col[s,0] += np.sum(count_out[np.where(b_out==s)])
-    M_s_col[r,0] -= count_self
-    M_s_col[s,0] += count_self
+        M_s_row = M[s, :].copy().reshape(1, B)
+        M_s_col = M[:, s].copy().reshape(B, 1)
+    M_s_row[0, b_out] += count_out
+    M_s_row[0, r] -= np.sum(count_in[np.where(b_in == s)])
+    M_s_row[0, s] += np.sum(count_in[np.where(b_in == s)])
+    M_s_row[0, r] -= count_self
+    M_s_row[0, s] += count_self
+    M_s_col[b_in, 0] += count_in.reshape(M_s_col[b_in, 0].shape)
+    M_s_col[r, 0] -= np.sum(count_out[np.where(b_out == s)])
+    M_s_col[s, 0] += np.sum(count_out[np.where(b_out == s)])
+    M_s_col[r, 0] -= count_self
+    M_s_col[s, 0] += count_self
     return M_r_row, M_s_row, M_r_col, M_s_col
+
 
 def compute_new_block_degrees(r, s, d_out, d_in, d, k_out, k_in, k):
     """Compute the new block degrees under the proposal for the current node or block
@@ -357,19 +362,16 @@ def compute_new_block_degrees(r, s, d_out, d_in, d, k_out, k_in, k):
         Notes
         -----
         The updates only involve changing the degrees of the current and proposed block"""
+    new = []
+    for old, degree in zip([d_out, d_in, d], [k_out, k_in, k]):
+        new_d = old.copy()
+        new_d[r] -= degree
+        new_d[s] += degree
+        new.append(new_d)
+    return new
 
-    d_out_new = d_out.copy()
-    d_out_new[r] -= k_out
-    d_out_new[s] += k_out
-    d_in_new = d_in.copy()
-    d_in_new[r] -= k_in
-    d_in_new[s] += k_in
-    d_new = d.copy()
-    d_new[r] -= k
-    d_new[s] += k
-    return d_out_new, d_in_new, d_new
 
-def compute_Hastings_correction(b_out, count_out, b_in, count_in, s, M, M_r_row, M_r_col, B, k, d, d_new, use_sparse):
+def compute_Hastings_correction(b_out, count_out, b_in, count_in, s, M, M_r_row, M_r_col, B, d, d_new, use_sparse):
     """Compute the Hastings correction for the proposed block from the current block
 
         Parameters
@@ -392,8 +394,6 @@ def compute_Hastings_correction(b_out, count_out, b_in, count_in, s, M, M_r_row,
                     the current block col of the new edge count matrix under proposal
         B : int
                     total number of blocks
-        k : (int)
-                    total number of edges to and from neighbors
         d : ndarray (int)
                     total number of edges to and from each block
         d_new : ndarray (int)
@@ -433,18 +433,26 @@ def compute_Hastings_correction(b_out, count_out, b_in, count_in, s, M, M_r_row,
 
         summed over all the neighboring blocks t"""
 
-    t, idx = np.unique(np.append(b_out, b_in), return_inverse = True) # find all the neighboring blocks
-    count = np.bincount(idx, weights=np.append(count_out, count_in)).astype(int) # count edges to neighboring blocks
+    t, idx = np.unique(np.append(b_out, b_in), return_inverse=True)  # find all the neighboring blocks
+    count = np.bincount(idx, weights=np.append(count_out, count_in)).astype(int)  # count edges to neighboring blocks
     if use_sparse:
-        p_forward = np.sum((count/float(k))*(M[t, s].toarray().ravel() + M[s, t].toarray().ravel() + 1) / (d[t] + B))
-        p_backward = np.sum((count/float(k))*(M_r_row[0,t].toarray().ravel() + M_r_col[t, 0].toarray().ravel() + 1) / (d_new[t] + B))
+        M_t_s = M[t, s].toarray().ravel()
+        M_s_t = M[s, t].toarray().ravel()
+        M_r_row = M_r_row[0, t].toarray().ravel()
+        M_r_col = M_r_col[t, 0].toarray().ravel()
     else:
-        p_forward = np.sum((count/float(k))*(M[t, s].ravel() + M[s, t].ravel() + 1) / (d[t] + B))
-        p_backward = np.sum((count/float(k))*(M_r_row[0,t].ravel() + M_r_col[t, 0].ravel() + 1) / (d_new[t] + B))
-    Hastings_correction = p_backward / p_forward
-    return Hastings_correction
+        M_t_s = M[t, s].ravel()
+        M_s_t = M[s, t].ravel()
+        M_r_row = M_r_row[0, t].ravel()
+        M_r_col = M_r_col[t, 0].ravel()
+        
+    p_forward = np.sum(count*(M_t_s + M_s_t + 1) / (d[t] + float(B)))
+    p_backward = np.sum(count*(M_r_row + M_r_col + 1) / (d_new[t] + float(B)))
+    return p_backward / p_forward
 
-def compute_delta_entropy(r, s, b_out, b_in, M, M_r_row, M_s_row, M_r_col, M_s_col, d_out, d_in, d_out_new, d_in_new, e, use_sparse):
+
+def compute_delta_entropy(r, s, b_out, b_in, M, M_r_row, M_s_row, M_r_col, M_s_col, d_out, d_in, d_out_new,
+                          d_in_new, e, use_sparse):
     """Compute change in entropy under the proposal. Reduced entropy means the proposed block is better than the current block.
 
         Parameters
@@ -504,26 +512,36 @@ def compute_delta_entropy(r, s, b_out, b_in, M, M_r_row, M_s_row, M_r_col, M_s_c
     t1 = np.unique(np.append(b_out, [r, s]))
     t2 = np.setdiff1d(b_in, [r, s]) # remove the current block and proposed block to avoid double counting
     # the delta entropy is computed by summing the differences across the two rows and columns of the inter-block edge count matrix
-    # the diagonal entries are included again in the end to include both the in and out edge counts
     if use_sparse:
-        delta_entropy = - np.sum(M_r_row[0,t1].toarray().ravel()*np.log((M_r_row[0,t1].toarray().ravel()+e) / (d_in_new[t1]+e) / (d_out_new[r]+e))) - \
-                        np.sum(M_s_row[0,t1].toarray().ravel()*np.log((M_s_row[0,t1].toarray().ravel()+e) / (d_in_new[t1]+e) / (d_out_new[s]+e))) - \
-                        np.sum(M_r_col[t2,0].toarray().ravel()*np.log((M_r_col[t2,0].toarray().ravel()+e) / (d_out_new[t2]+e) / (d_in_new[r]+e))) - \
-                        np.sum(M_s_col[t2,0].toarray().ravel()*np.log((M_s_col[t2,0].toarray().ravel()+e) / (d_out_new[t2]+e) / (d_in_new[s]+e))) + \
-                        np.sum(M[r,t1].toarray().ravel()*np.log((M[r,t1].toarray().ravel()+e) / (d_in[t1]+e) / (d_out[r]+e))) + \
-                        np.sum(M[s,t1].toarray().ravel()*np.log((M[s,t1].toarray().ravel()+e) / (d_in[t1]+e) / (d_out[s]+e))) + \
-                        np.sum(M[t2,r].toarray().ravel()*np.log((M[t2,r].toarray().ravel()+e) / (d_out[t2]+e) / (d_in[r]+e))) + \
-                        np.sum(M[t2,s].toarray().ravel()*np.log((M[t2,s].toarray().ravel()+e) / (d_out[t2]+e) / (d_in[s]+e)))
+        M_r_row = M_r_row[0, t1].toarray()
+        M_s_row = M_s_row[0, t1].toarray()
+        M_r_col = M_r_col[t2, 0].toarray()
+        M_s_col = M_s_col[t2, 0].toarray()
+        M_r_t1 = M[r, t1].toarray()
+        M_s_t1 = M[s, t1].toarray()
+        M_t2_r = M[t2, r].toarray()
+        M_t2_s = M[t2, s].toarray()
     else:
-        delta_entropy = - np.sum(M_r_row[0,t1].ravel()*np.log((M_r_row[0,t1].ravel()+e) / (d_in_new[t1]+e) / (d_out_new[r]+e))) - \
-                        np.sum(M_s_row[0,t1].ravel()*np.log((M_s_row[0,t1].ravel()+e) / (d_in_new[t1]+e) / (d_out_new[s]+e))) - \
-                        np.sum(M_r_col[t2,0].ravel()*np.log((M_r_col[t2,0].ravel()+e) / (d_out_new[t2]+e) / (d_in_new[r]+e))) - \
-                        np.sum(M_s_col[t2,0].ravel()*np.log((M_s_col[t2,0].ravel()+e) / (d_out_new[t2]+e) / (d_in_new[s]+e))) + \
-                        np.sum(M[r,t1].ravel()*np.log((M[r,t1].ravel()+e) / (d_in[t1]+e) / (d_out[r]+e))) + \
-                        np.sum(M[s,t1].ravel()*np.log((M[s,t1].ravel()+e) / (d_in[t1]+e) / (d_out[s]+e))) + \
-                        np.sum(M[t2,r].ravel()*np.log((M[t2,r].ravel()+e) / (d_out[t2]+e) / (d_in[r]+e))) + \
-                        np.sum(M[t2,s].ravel()*np.log((M[t2,s].ravel()+e) / (d_out[t2]+e) / (d_in[s]+e)))
+        M_r_row = M_r_row[0, t1]
+        M_s_row = M_s_row[0, t1]
+        M_r_col = M_r_col[t2, 0]
+        M_s_col = M_s_col[t2, 0]
+        M_r_t1 = M[r, t1]
+        M_s_t1 = M[s, t1]
+        M_t2_r = M[t2, r]
+        M_t2_s = M[t2, s]
+
+    delta_entropy = 0
+    delta_entropy -= np.sum(M_r_row * np.log((M_r_row + e) / (d_in_new[t1] + e) / (d_out_new[r] + e)))
+    delta_entropy -= np.sum(M_s_row * np.log((M_s_row + e) / (d_in_new[t1] + e) / (d_out_new[s] + e)))
+    delta_entropy -= np.sum(M_r_col * np.log((M_r_col + e) / (d_out_new[t2] + e) / (d_in_new[r] + e)))
+    delta_entropy -= np.sum(M_s_col * np.log((M_s_col + e) / (d_out_new[t2] + e) / (d_in_new[s] + e)))
+    delta_entropy += np.sum(M_r_t1 * np.log((M_r_t1 + e) / (d_in[t1] + e) / (d_out[r] + e)))
+    delta_entropy += np.sum(M_s_t1 * np.log((M_s_t1 + e) / (d_in[t1] + e) / (d_out[s] + e)))
+    delta_entropy += np.sum(M_t2_r * np.log((M_t2_r + e) / (d_out[t2] + e) / (d_in[r] + e)))
+    delta_entropy += np.sum(M_t2_s * np.log((M_t2_s + e) / (d_out[t2] + e) / (d_in[s] + e)))
     return delta_entropy
+
 
 def carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_block, b, B, B_to_merge):
     """Execute the best merge (agglomerative) moves to reduce a set number of blocks
@@ -549,23 +567,24 @@ def carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_bloc
                     total number of blocks after the merge"""
 
     bestMerges = delta_entropy_for_each_block.argsort()
-    block_map = np.array(range(B))
+    block_map = np.arange(B)
     num_merge = 0
-    counter = 0;
-    while (num_merge < B_to_merge):
+    counter = 0
+    while num_merge < B_to_merge:
         mergeFrom = bestMerges[counter]
         mergeTo = block_map[best_merge_for_each_block[bestMerges[counter]]]
         counter += 1
         if mergeTo != mergeFrom:
-            block_map[np.where(block_map==mergeFrom)] = mergeTo
-            b[np.where(b==mergeFrom)] = mergeTo
+            block_map[np.where(block_map == mergeFrom)] = mergeTo
+            b[np.where(b == mergeFrom)] = mergeTo
             num_merge += 1
     remaining_blocks = np.unique(b)
-    mapping = -np.ones(B, dtype = int)
-    mapping[remaining_blocks] = np.array(range(len(remaining_blocks)))
+    mapping = -np.ones(B, dtype=int)
+    mapping[remaining_blocks] = np.arange(len(remaining_blocks))
     b = mapping[b]
-    B = B - B_to_merge
+    B -= B_to_merge
     return b, B
+
 
 def update_partition(b, ni, r, s, M, M_r_row, M_s_row, M_r_col, M_s_col, d_out_new, d_in_new, d_new, use_sparse):
     """Move the current node to the proposed block and update the edge counts
@@ -613,15 +632,16 @@ def update_partition(b, ni, r, s, M, M_r_row, M_s_row, M_r_col, M_s_col, d_out_n
                     the total degree of each block after the move"""
 
     b[ni] = s
-    M[r,:] = M_r_row
-    M[s,:] = M_s_row
+    M[r, :] = M_r_row
+    M[s, :] = M_s_row
     if use_sparse:
-        M[:,r] = M_r_col
-        M[:,s] = M_s_col
+        M[:, r] = M_r_col
+        M[:, s] = M_s_col
     else:
-        M[:,r] = M_r_col.reshape(M[:,r].shape)
-        M[:,s] = M_s_col.reshape(M[:,s].shape)
+        M[:, r] = M_r_col.reshape(M[:, r].shape)
+        M[:, s] = M_s_col.reshape(M[:, s].shape)
     return b, M, d_out_new, d_in_new, d_new
+
 
 def compute_overall_entropy(M, d_out, d_in, B, N, E, use_sparse):
     """Compute the overall entropy, including the model entropy as well as the data entropy, on the current partition.
@@ -663,19 +683,21 @@ def compute_overall_entropy(M, d_out, d_in, B, N, E, use_sparse):
         
         where the function h(x)=(1+x)\ln(1+x) - x\ln(x) and the sum runs over all entries (t_1, t_2) in the edge count matrix"""
 
-    nonzeros = M.nonzero() # all non-zero entries
+    nonzeros = M.nonzero()  # all non-zero entries
+    edge_count_entries = M[nonzeros[0], nonzeros[1]]
     if use_sparse:
-        edge_count_entries = M[nonzeros[0], nonzeros[1]].toarray()
-    else:
-        edge_count_entries = M[nonzeros[0], nonzeros[1]]
+        edge_count_entries = edge_count_entries.toarray()
+
     entries = edge_count_entries * np.log(edge_count_entries / (d_out[nonzeros[0]] * d_in[nonzeros[1]]).astype(float))
     data_S = -np.sum(entries)
     model_S_term = B**2 / float(E)
-    model_S = E * (1+model_S_term) * np.log((1+model_S_term)) - model_S_term * np.log(model_S_term) + N*np.log(B)
+    model_S = E * (1 + model_S_term) * np.log(1 + model_S_term) - model_S_term * np.log(model_S_term) + N*np.log(B)
     S = model_S + data_S
     return S
 
-def prepare_for_partition_on_next_num_blocks(S, b, M, d, d_out, d_in, B, old_b, old_M, old_d, old_d_out, old_d_in, old_S, old_B, B_rate):
+
+def prepare_for_partition_on_next_num_blocks(S, b, M, d, d_out, d_in, B, old_b, old_M, old_d, old_d_out, old_d_in,
+                                             old_S, old_B, B_rate):
     """Checks to see whether the current partition has the optimal number of blocks. If not, the next number of blocks
        to try is determined and the intermediate variables prepared.
 
@@ -756,81 +778,60 @@ def prepare_for_partition_on_next_num_blocks(S, b, M, d, d_out, d_in, B, old_b, 
 
     optimal_B_found = False
     B_to_merge = 0
+
     # update the best three partitions so far and their statistics
-    if S <= old_S[1]: # if the current partition is the best so far
-        if old_B[1] > B: # if the current number of blocks is smaller than the previous best number of blocks
-            old_b[0] = old_b[1]
-            old_M[0] = old_M[1]
-            old_d[0] = old_d[1]
-            old_d_out[0] = old_d_out[1]
-            old_d_in[0] = old_d_in[1]
-            old_S[0] = old_S[1]
-            old_B[0] = old_B[1]
-        else:
-            old_b[2] = old_b[1]
-            old_M[2] = old_M[1]
-            old_d[2] = old_d[1]
-            old_d_out[2] = old_d_out[1]
-            old_d_in[2] = old_d_in[1]
-            old_S[2] = old_S[1]
-            old_B[2] = old_B[1]
-        old_b[1] = b
-        old_M[1] = M
-        old_d[1] = d
-        old_d_out[1] = d_out
-        old_d_in[1] = d_in
-        old_S[1] = S
-        old_B[1] = B
-    else: # the current partition is not the best so far
-        if old_B[1] > B: # if the current number of blocks is smaller than the best number of blocks so far
-            old_b[2] = b
-            old_M[2] = M
-            old_d[2] = d
-            old_d_out[2] = d_out
-            old_d_in[2] = d_in
-            old_S[2] = S
-            old_B[2] = B
-        else:
-            old_b[0] = b
-            old_M[0] = M
-            old_d[0] = d
-            old_d_out[0] = d_out
-            old_d_in[0] = d_in
-            old_S[0] = S
-            old_B[0] = B
+    if S <= old_S[1]:  # if the current partition is the best so far
+        # if the current number of blocks is smaller than the previous best number of blocks
+        old_index = 0 if old_B[1] > B else 2
+        old_b[old_index] = old_b[1]
+        old_M[old_index] = old_M[1]
+        old_d[old_index] = old_d[1]
+        old_d_out[old_index] = old_d_out[1]
+        old_d_in[old_index] = old_d_in[1]
+        old_S[old_index] = old_S[1]
+        old_B[old_index] = old_B[1]
+
+        index = 1
+    else:  # the current partition is not the best so far
+        # if the current number of blocks is smaller than the best number of blocks so far
+        index = 2 if old_B[1] > B else 0
+
+    old_b[index] = b
+    old_M[index] = M
+    old_d[index] = d
+    old_d_out[index] = d_out
+    old_d_in[index] = d_in
+    old_S[index] = S
+    old_B[index] = B
+
     # find the next number of blocks to try using golden ratio bisection
-    if (old_S[2]==np.Inf): # if the three points in the golden ratio bracket has not yet been established
+    if old_S[2] == np.Inf:  # if the three points in the golden ratio bracket has not yet been established
         B_to_merge = int(B*B_rate)
         b = old_b[1].copy()
         M = old_M[1].copy()
         d = old_d[1].copy()
         d_out = old_d_out[1].copy()
         d_in = old_d_in[1].copy()
-    else: # golden ratio search bracket established
-        if (old_B[0]-old_B[2]==2): # we have found the partition with the optimal number of blocks
+    else:  # golden ratio search bracket established
+        if old_B[0] - old_B[2] == 2:  # we have found the partition with the optimal number of blocks
             optimal_B_found = True
             B = old_B[1]
             b = old_b[1]
-        else: # not done yet, find the next number of block to try according to the golden ratio search
-            if (old_B[0]-old_B[1]) >= (old_B[1]-old_B[2]): # the higher segment in the bracket is bigger
-                next_B_to_try = old_B[1] + np.round((old_B[0]-old_B[1])*0.618).astype(int)
-                B_to_merge = old_B[0] - next_B_to_try
-                B = old_B[0]
-                b = old_b[0].copy()
-                M = old_M[0].copy()
-                d = old_d[0].copy()
-                d_out = old_d_out[0].copy()
-                d_in = old_d_in[0].copy()
-            else: # the lower segment in the bracket is bigger
-                next_B_to_try = old_B[2] + np.round((old_B[1]-old_B[2])*0.618).astype(int)
-                B_to_merge = old_B[1] - next_B_to_try
-                B = old_B[1]
-                b = old_b[1].copy()
-                M = old_M[1].copy()
-                d = old_d[1].copy()
-                d_out = old_d_out[1].copy()
-                d_in = old_d_in[1].copy()
+        else:  # not done yet, find the next number of block to try according to the golden ratio search
+            if (old_B[0]-old_B[1]) >= (old_B[1]-old_B[2]):  # the higher segment in the bracket is bigger
+                index = 0
+            else:  # the lower segment in the bracket is bigger
+                index = 1
+            next_B_to_try = old_B[index + 1] + np.round((old_B[index] - old_B[index + 1]) * 0.618).astype(int)
+            B_to_merge = old_B[index] - next_B_to_try
+            B = old_B[index]
+            b = old_b[index].copy()
+            M = old_M[index].copy()
+            d = old_d[index].copy()
+            d_out = old_d_out[index].copy()
+            d_in = old_d_in[index].copy()
     return b, M, d, d_out, d_in, B, B_to_merge, old_b, old_M, old_d, old_d_out, old_d_in, old_S, old_B, optimal_B_found
+
 
 def plot_graph_with_partition(out_neighbors, b, graph_object=[]):
     """Plot the graph with force directed layout and color/shape each node according to its block assignment
@@ -850,9 +851,9 @@ def plot_graph_with_partition(out_neighbors, b, graph_object=[]):
         graph_object : graph tool object
                     the graph tool object containing the graph and the node position info"""
 
-    if use_graph_tool_options: # nothing is done if the graph tool option is off
+    if use_graph_tool_options:  # nothing is done if the graph tool option is off
         if len(out_neighbors) <= 5000:
-            if graph_object==[]:
+            if graph_object == []:
                 graph_object = gt.Graph()
                 graph_object.add_edge_list([(i,j) for i in range(len(out_neighbors)) for j in out_neighbors[i][:,0]])
                 graph_object.vp['pos'] = gt.sfdp_layout(graph_object)
@@ -860,10 +861,12 @@ def plot_graph_with_partition(out_neighbors, b, graph_object=[]):
             vertex_shape = graph_object.new_vertex_property("int")
             block_membership.a = b
             vertex_shape.a = np.mod(block_membership.a,10)
-            gt.graph_draw(graph_object,output_size=(1000,1000), pos = graph_object.vp['pos'], vertex_shape = vertex_shape, vertex_fill_color = block_membership, edge_pen_width = 0.3, edge_marker_size = 4)
+            gt.graph_draw(graph_object, inline=True, output_size=(600,600), pos=graph_object.vp['pos'], vertex_shape=vertex_shape,
+                          vertex_fill_color=block_membership, edge_pen_width=0.3, edge_marker_size=4)
         else:
             print('That\'s a big graph!')
     return graph_object
+
 
 def evaluate_partition(true_b, alg_b):
     """Evaluate the output partition against the truth partition and report the correctness metrics.

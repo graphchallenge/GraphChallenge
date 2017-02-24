@@ -4,7 +4,7 @@ use_timeit = True # for timing runs (optional)
 if use_timeit:
     import timeit
 
-input_filename = '../../data/static/simulated_blockmodel_graph_500_nodes'
+input_filename = '../../data/static/simulated_blockmodel_graph_100_nodes'
 true_partition_available = True
 visualize_graph = False  # whether to plot the graph layout colored with intermediate partitions
 verbose = True  # whether to print updates of the partitioning
@@ -169,7 +169,7 @@ while not optimal_num_blocks_found:
                                                                   interblock_edge_count,
                                                                   new_interblock_edge_count_current_block_row,
                                                                   new_interblock_edge_count_current_block_col,
-                                                                  num_blocks, num_neighbor_edges, block_degrees,
+                                                                  num_blocks, block_degrees,
                                                                   block_degrees_new, use_sparse_matrix)
 
                 # compute change in entropy / posterior
