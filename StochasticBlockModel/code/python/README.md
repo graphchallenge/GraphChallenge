@@ -1,4 +1,5 @@
 # Python code for the baseline graph partition algorithm
+For clarity and simplicity, here is a pure Python implementation of the baseline algorithm. Runtime-wise, it is about an order of magnitude slower than the C++ implementation.
 
 ## Source code
 
