@@ -21,8 +21,6 @@ This baseline implementation uses the following Python modules:
 ### Required modules (standard or easy to install)
 - pandas : for loading input graph TSV files
 
-- sys : standard module for determining the smallest positive floating value of the computing platform
-
 - numpy : used extensively for storage and computations
 
 - scipy : for sparse matrix and some specific computations
