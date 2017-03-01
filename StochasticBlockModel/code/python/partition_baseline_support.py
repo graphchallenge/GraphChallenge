@@ -517,12 +517,15 @@ def compute_delta_entropy(r, s, M, M_r_row, M_s_row, M_r_col, M_s_col, d_out, d_
         M_t2_s = M[:, s]
 
     # remove r and s from the cols to avoid double counting
-    M_r_col = np.delete(M_r_col, [r,s])
-    M_s_col = np.delete(M_s_col, [r,s])
-    M_t2_r = np.delete(M_t2_r, [r,s])
-    M_t2_s = np.delete(M_t2_s, [r,s])
-    d_out_new_ = np.delete(d_out_new, [r, s])
-    d_out_ = np.delete(d_out, [r, s])
+    idx = range(len(d_in_new))
+    del idx[max(r, s)]
+    del idx[min(r, s)]
+    M_r_col = M_r_col[idx]
+    M_s_col = M_s_col[idx]
+    M_t2_r = M_t2_r[idx]
+    M_t2_s = M_t2_s[idx]
+    d_out_new_ = d_out_new[idx]
+    d_out_ = d_out[idx]
 
     # only keep non-zero entries to avoid unnecessary computation
     d_in_new_r_row = d_in_new[M_r_row.ravel().nonzero()]
