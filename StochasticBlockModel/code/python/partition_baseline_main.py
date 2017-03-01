@@ -1,10 +1,9 @@
 from partition_baseline_support import *
-import sys
 use_timeit = True # for timing runs (optional)
 if use_timeit:
     import timeit
 
-input_filename = '../../data/static/simulated_blockmodel_graph_100_nodes'
+input_filename = '../../data/static/simulated_blockmodel_graph_500_nodes'
 true_partition_available = True
 visualize_graph = False  # whether to plot the graph layout colored with intermediate partitions
 verbose = True  # whether to print updates of the partitioning
@@ -23,7 +22,6 @@ partition = np.array(range(num_blocks))
 
 # partition update parameters
 beta = 3  # exploitation versus exploration (higher value favors exploitation)
-epsilon = sys.float_info.epsilon  # small constant for preventing division by and taking log on 0
 use_sparse_matrix = False  # whether to represent the edge count matrix using sparse matrix
                            # Scipy's sparse matrix is slow but this may be necessary for large graphs
 
@@ -100,13 +98,13 @@ while not optimal_num_blocks_found:
                                                                                                        num_neighbor_edges)
 
             # compute change in entropy / posterior
-            delta_entropy = compute_delta_entropy(current_block, proposal, out_blocks[:, 0], in_blocks[:, 0],
-                                                  interblock_edge_count, new_interblock_edge_count_current_block_row,
+            delta_entropy = compute_delta_entropy(current_block, proposal, interblock_edge_count,
+                                                  new_interblock_edge_count_current_block_row,
                                                   new_interblock_edge_count_new_block_row,
                                                   new_interblock_edge_count_current_block_col,
                                                   new_interblock_edge_count_new_block_col, block_degrees_out,
                                                   block_degrees_in, block_degrees_out_new, block_degrees_in_new,
-                                                  epsilon, use_sparse_matrix)
+                                                  use_sparse_matrix)
             if delta_entropy < delta_entropy_for_each_block[current_block]:  # a better block candidate was found
                 best_merge_for_each_block[current_block] = proposal
                 delta_entropy_for_each_block[current_block] = delta_entropy
@@ -173,14 +171,13 @@ while not optimal_num_blocks_found:
                                                                   block_degrees_new, use_sparse_matrix)
 
                 # compute change in entropy / posterior
-                delta_entropy = compute_delta_entropy(current_block, proposal, blocks_out, blocks_in,
-                                                      interblock_edge_count,
+                delta_entropy = compute_delta_entropy(current_block, proposal, interblock_edge_count,
                                                       new_interblock_edge_count_current_block_row,
                                                       new_interblock_edge_count_new_block_row,
                                                       new_interblock_edge_count_current_block_col,
                                                       new_interblock_edge_count_new_block_col, block_degrees_out,
                                                       block_degrees_in, block_degrees_out_new, block_degrees_in_new,
-                                                      epsilon, use_sparse_matrix)
+                                                      use_sparse_matrix)
 
                 # compute probability of acceptance
                 p_accept = np.min([np.exp(-beta * delta_entropy) * Hastings_correction, 1])
