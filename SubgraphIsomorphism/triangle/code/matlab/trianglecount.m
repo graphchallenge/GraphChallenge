@@ -7,7 +7,7 @@
 %       inc_mtx_file - full path to TSV file containing input incidence matrix
 %
 
-function numTriangles = trianglecount(adj_mtx_file, inc_mtx_file)
+function [numTriangles, T] = trianglecount(adj_mtx_file, inc_mtx_file)
 
 % read data
 if exist(adj_mtx_file, 'file')
@@ -45,6 +45,12 @@ t_triangle_count = etime(clock, t0);
 
 fprintf('number of triangles : %d\ntime to count triangles : %f seconds\n', ...
     numTriangles, t_triangle_count );
+
+T = struct('t_create_adj', t_create_adj, ...
+	   't_create_inc', t_create_inc, ...
+	   't_read_adj', t_read_adj, ...
+	   't_read_inc', t_read_inc, ...
+	   't_triangle_count', t_triangle_count);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Graph Challenge benchmark
