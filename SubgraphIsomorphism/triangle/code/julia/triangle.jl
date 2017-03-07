@@ -21,8 +21,8 @@ function triangle(adj_mtx_file, inc_mtx_file)
     t_mult=@elapsed C = A*B;
     println("matrix multiplication time : ", t_mult);
     
-    t_find=@elapsed y = find( C.==2 );
-    nt = length(y)/3;
+    t_find=@elapsed y = sum(C) - nnz(C);
+    nt = y/3;
     println("triangle count time : ", t_find+t_mult);
     println("number of triangles : ", nt);
     
