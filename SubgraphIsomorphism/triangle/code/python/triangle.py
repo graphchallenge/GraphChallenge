@@ -70,29 +70,6 @@ def triangle(adj_mtx_file, inc_mtx_file):
 
     return (num_triangles,t_read_adj,t_adj_reshape,t_read_inc,t_inc_reshape,t_triangle_count)
 
-def run_once( pathname ):
-    logger = getlogger()
-    logger.info('processing ' + pathname)
-    path, dirname = os.path.split(pathname)
-    adj_mtx_file = os.path.join( pathname, dirname + '_adj.mmio')
-    if not os.path.isfile(adj_mtx_file):
-        print 'unable to find file : ', adj_mtx_file
-        return -1
-
-    inc_mtx_file = os.path.join( pathname, dirname + '_inc.mmio')
-    if not os.path.isfile(inc_mtx_file):
-        logger.info('file  not found - ' + inc_mtx_file)
-        return -1
-
-    return triangle( adj_mtx_file, inc_mtx_file )
-
-def run_all( datadir ):
-    for dirname in glob(datadir + os.path.sep + '*'):
-        # in each directory find the matrix files and count triangles
-        run_once( dirname )
-    print '\n=> done\n'
-    return
-
 
 ########################################################
 # GraphChallenge Benchmark
