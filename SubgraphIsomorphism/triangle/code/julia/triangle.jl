@@ -1,7 +1,7 @@
 
-function triangle(adj_mtx_file, inc_mtx_file)
-    if ~isfile( adj_mtx_file ) || ~isfile( inc_mtx_file )
-        println("unable to open input files");
+function triangle(adj_mtx_file)
+    if ~isfile( adj_mtx_file ) 
+        println("unable to open input file");
         return (-1);
     end
 
@@ -12,18 +12,11 @@ function triangle(adj_mtx_file, inc_mtx_file)
     t_create_adj=@elapsed A = sparse( ii[:,1], ii[:,2], ii[:,3] );
     println("sparse adj. matrix creation time : ", t_create_adj);
     
-    t_read_inc=@elapsed ii = readdlm( inc_mtx_file, '\t', Int64);
-    println("incidence matrix read time : ", t_read_inc);
-
-    t_create_inc=@elapsed B = sparse( ii[:,1], ii[:,2], ii[:,3] );
-    println("sparse adj. matrix creation time : ", t_create_inc);
-    
-    t_mult=@elapsed C = A*B;
-    println("matrix multiplication time : ", t_mult);
-    
-    t_find=@elapsed y = sum(C) - nnz(C);
-    nt = y/3;
-    println("triangle count time : ", t_find+t_mult);
+    tic;
+    C = A*A;
+    nt = sum(C.*A)/6;
+    t = toc;
+    println("triangle count time : ", t);
     println("number of triangles : ", nt);
     
     return(nt)
