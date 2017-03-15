@@ -1,4 +1,4 @@
-""" This Python script runs the graph-tool graph partition algorithm by Tiago Peixoto."""
+""" This Python script runs the graph-tool graph partition algorithm by Tiago Peixoto. Tested with the Graph-tool v.2.16 module."""
 
 from run_graph_tool_partition_alg_support import *
 import graph_tool.all as gt

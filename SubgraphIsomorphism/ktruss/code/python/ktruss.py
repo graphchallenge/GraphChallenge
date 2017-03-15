@@ -25,19 +25,6 @@ def StrArrayRead(filename):
 
 ###################################################
 ###################################################
-def spAny(nparray):
-    
-    val=np.empty((nparray.shape[0],1))
-    for x in range(nparray.shape[0]):
-        if nparray[x,:].nnz > 0:
-            val[x]=1
-        else:
-            val[x]=0
-    return val
-
-
-###################################################
-###################################################
 def set_zero_rows(sparray, rowNum):
     for row in rowNum:
         sparray.data[sparray.indptr[row]:sparray.indptr[row+1]]=0
@@ -88,12 +75,11 @@ def ktruss (inc_mat_file,k):
     xc= (s >=k-2).astype(int)
     
     while xc.sum() != np.unique(sp.sparse.find(E)[0]).shape:
-        x=np.where(xc==0)[0]
+	x=sp.sparse.find(xc==0)[0]
+	#x=np.where(xc==0)[0]
         set_zero_rows(E, x)
         E.eliminate_zeros()
         tmp=np.transpose(E)*E
-        #set_diag_val(tmp,0)
-        #sizeX=np.shape(tmp)[0]
         (tmp).setdiag(np.zeros(np.shape(tmp)[0]),k=0)
         tmp.eliminate_zeros()
         s=csr_matrix(((R==2).astype(float)).sum(axis=1))

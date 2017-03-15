@@ -30,5 +30,5 @@ This baseline implementation uses the following Python modules:
 ### Optional modules
 - timeit : for timing each run (https://docs.python.org/2/library/timeit.html)
 
-- graph_tool : for visualizing the intermediate partitioning results (https://graph-tool.skewed.de/)
+- graph_tool : for visualizing the intermediate partitioning results (https://graph-tool.skewed.de/). Tested with v.2.16.
 

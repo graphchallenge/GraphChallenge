@@ -1,6 +1,6 @@
 # C++ code for the baseline graph partition algorithm
 
-The baseline graph partition algorithm is implemented in the open source graph-tool repository by Tiago Peixoto: https://github.com/count0/graph-tool
+The baseline graph partition algorithm is implemented in the open source graph-tool repository by Tiago Peixoto: https://git.skewed.de/count0/graph-tool/tree/master
 
 The implementation is in C++ with Python wrappers so the top level functions are accessible in Python. Specifically, the top level function for invoking the baseline algorithm is minimize_blockmodel_dl, found in "/src/graph_tool/inference/minimize.py". All the core C++ code is under "/src/graph/inference/"
 
