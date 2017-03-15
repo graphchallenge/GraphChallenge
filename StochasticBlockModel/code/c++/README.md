@@ -12,17 +12,17 @@ To run this C++ implementation, simply install the graph-tool module, and run th
 
 The following Python modules are required for running this script:
 
-- graph_tool : for running the partition algorithm (https://graph-tool.skewed.de/)
+- graph_tool : For running the partition algorithm (https://graph-tool.skewed.de/). Tested with v.2.16 (parallel MCMC updates seem to crash in later versions)
 
-- pandas : for loading input graph TSV files
+- pandas : For loading input graph TSV files
 
-- numpy : for storing the graph
+- numpy : For storing the graph
 
 The modules below are optional for evaluating the resulting partition and timing the run:
 
-- scipy : for the combinatoric computation in evaluation
+- scipy : For the combinatoric computation in evaluation
 
-- munkres : linear assignment module for computing the correctness metrics, by Brian Clapper (https://pypi.python.org/pypi/munkres/)
+- munkres : Linear assignment module for computing the correctness metrics, by Brian Clapper (https://pypi.python.org/pypi/munkres/)
 
-- timeit : for timing each run (https://docs.python.org/2/library/timeit.html)
+- timeit : For timing each run (https://docs.python.org/2/library/timeit.html)
 
