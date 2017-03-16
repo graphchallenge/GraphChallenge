@@ -3,7 +3,7 @@ use_timeit = True # for timing runs (optional)
 if use_timeit:
     import timeit
 
-input_filename = '../../data/static/simulated_blockmodel_graph_500_nodes'
+input_filename = '../../data/static/simulated_blockmodel_graph_5000_nodes'
 true_partition_available = True
 visualize_graph = False  # whether to plot the graph layout colored with intermediate partitions
 verbose = True  # whether to print updates of the partitioning

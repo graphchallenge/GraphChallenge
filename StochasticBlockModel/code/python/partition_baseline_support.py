@@ -49,8 +49,8 @@ def load_graph(input_filename, true_partition_available):
         to N-1. If available, the true partition is stored in the file `filename_truePartition.tsv`."""
 
     # read the entire graph CSV into rows of edges
-    edge_rows = pd.read_csv('{}.tsv'.format(input_filename), delimiter='\t').as_matrix()
-    N = edge_rows[:, 0:1].max() + 1
+    edge_rows = pd.read_csv('{}.tsv'.format(input_filename), delimiter='\t', header=None).as_matrix()
+    N = edge_rows[:, 0:1].max()
     out_neighbors = [[] for i in range(N)]
     in_neighbors = [[] for i in range(N)]
     weights_included = edge_rows.shape[1] == 3
@@ -61,8 +61,9 @@ def load_graph(input_filename, true_partition_available):
             edge_weight = edge_rows[i, 2]
         else:
             edge_weight = 1
-        out_neighbors[edge_rows[i, 0]].append([edge_rows[i, 1], edge_weight])
-        in_neighbors[edge_rows[i, 1]].append([edge_rows[i, 0], edge_weight])
+        # -1 on the node index since Python is 0-indexed and the standard graph TSV is 1-indexed
+        out_neighbors[edge_rows[i, 0] - 1].append([edge_rows[i, 1] - 1, edge_weight])
+        in_neighbors[edge_rows[i, 1] - 1].append([edge_rows[i, 0] - 1, edge_weight])
 
     # convert each neighbor list to neighbor numpy arrays for faster access
     for i in range(N):
@@ -77,9 +78,10 @@ def load_graph(input_filename, true_partition_available):
     if true_partition_available:
         true_b = np.zeros(len(out_neighbors), dtype=int)
         # read the entire true partition CSV into rows of partitions
-        true_b_rows = pd.read_csv('{}_truePartition.tsv'.format(input_filename), delimiter='\t').as_matrix()
+        true_b_rows = pd.read_csv('{}_truePartition.tsv'.format(input_filename), delimiter='\t', header=None).as_matrix()
         for i in range(true_b_rows.shape[0]):
-            true_b[true_b_rows[i, 0]] = int(true_b_rows[i, 1])
+            true_b[true_b_rows[i, 0] - 1] = int(
+                true_b_rows[i, 1] - 1)  # -1 since Python is 0-indexed and the TSV is 1-indexed
 
     if true_partition_available:
         return out_neighbors, in_neighbors, N, E, true_b

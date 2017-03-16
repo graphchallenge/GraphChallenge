@@ -4,7 +4,7 @@ from run_graph_tool_partition_alg_support import *
 import graph_tool.all as gt
 import timeit
 
-input_filename = '../../data/static/simulated_blockmodel_graph_500_nodes'
+input_filename = '../../data/static/simulated_blockmodel_graph_20000_nodes'
 out_neighbors, in_neighbors, N, E, true_partition = load_graph(input_filename, True)
 input_graph = gt.Graph()
 input_graph.add_edge_list([(i,j) for i in range(len(out_neighbors)) for j in out_neighbors[i][:,0]])
