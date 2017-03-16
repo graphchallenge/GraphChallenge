@@ -1,12 +1,12 @@
 
-function ktruss(inc_mtx_file, k)
-    if ~isfile( inc_mtx_file )
+function ktruss(adj_mtx_file, k)
+    if ~isfile( adj_mtx_file )
         println("unable to open input file");
         return (-1);
     end
 
     # load input data       
-    t_read_inc=@elapsed ii = readdlm( inc_mtx_file, '\t', Int64);
+    t_read_inc=@elapsed ii = readdlm( adj_mtx_file, '\t', Int64);
     println("incidence matrix read time : ", t_read_inc);
 
     t_create_inc=@elapsed E = sparse( ii[:,1], ii[:,2], ii[:,3] );
@@ -14,7 +14,7 @@ function ktruss(inc_mtx_file, k)
 
     #
     tmp = E.'*E;
-    R = E * ( tmp - sparse(diagm(diag(tmp))) );    
+    R = E * ( tmp - spdiagm(diag(tmp)) );    
     id = sparse( R .== 2 );
     s = sum( id, 2);
 
@@ -22,7 +22,7 @@ function ktruss(inc_mtx_file, k)
     xc = s .>= (k-2); # full matrix unless we cast it to sparse
     while sum(xc) != sum( any(E,2) )
         E[find(x), :] = 0
-        R = E * ( tmp - sparse(diagm(diag(tmp))) );
+        R = E * ( tmp - spdiagm(diag(tmp)) );
         id = sparse( R .== 2 );
         s = sum( id, 2);
 
