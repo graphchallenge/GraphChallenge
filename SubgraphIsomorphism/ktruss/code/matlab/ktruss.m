@@ -3,7 +3,7 @@
 %       inc_mat_file - path to file containing incidence matrix
 %       k 
 %
-function E = ktruss(inc_mat_file, k)
+function [E,t_ktruss] = ktruss(inc_mat_file, k)
 
 ii = load(inc_mat_file);
 t0 = clock;
