@@ -18,7 +18,7 @@ if use_graph_tool_options:
     import graph_tool.all as gt
 
 
-def load_graph(input_filename, true_partition_available):
+def load_graph(input_filename, load_true_partition, strm_piece_num=None, out_neighbors=None, in_neighbors=None):
     """Load the graph from a TSV file with standard format, and the truth partition if available
 
         Parameters
@@ -27,6 +27,11 @@ def load_graph(input_filename, true_partition_available):
                 input file name not including the .tsv extension
         true_partition_available : bool
                 whether the truth partition is available
+        strm_piece_num : int, optional
+                specify which stage of the streaming graph to load
+        out_neighbors, in_neighbors : list of ndarray, optional
+                existing graph to add to. This is used when loading the streaming graphs one stage at a time. Note that
+                the truth partition is loaded all together at once.
 
         Returns
         -------
@@ -49,10 +54,22 @@ def load_graph(input_filename, true_partition_available):
         to N-1. If available, the true partition is stored in the file `filename_truePartition.tsv`."""
 
     # read the entire graph CSV into rows of edges
-    edge_rows = pd.read_csv('{}.tsv'.format(input_filename), delimiter='\t', header=None).as_matrix()
-    N = edge_rows[:, 0:1].max()
-    out_neighbors = [[] for i in range(N)]
-    in_neighbors = [[] for i in range(N)]
+    if (strm_piece_num == None):
+        edge_rows = pd.read_csv('{}.tsv'.format(input_filename), delimiter='\t', header=None).as_matrix()
+    else:
+        edge_rows = pd.read_csv('{}_{}.tsv'.format(input_filename, strm_piece_num), delimiter='\t',
+                                header=None).as_matrix()
+
+    if (out_neighbors == None):  # no previously loaded streaming pieces
+        N = edge_rows[:, 0:2].max()  # number of nodes
+        out_neighbors = [[] for i in range(N)]
+        in_neighbors = [[] for i in range(N)]
+    else:  # add to previously loaded streaming pieces
+        N = max(edge_rows[:, 0:2].max(), len(out_neighbors))  # number of nodes
+        out_neighbors = [list(out_neighbors[i]) for i in range(len(out_neighbors))]
+        out_neighbors.extend([[] for i in range(N - len(out_neighbors))])
+        in_neighbors = [list(in_neighbors[i]) for i in range(len(in_neighbors))]
+        in_neighbors.extend([[] for i in range(N - len(in_neighbors))])
     weights_included = edge_rows.shape[1] == 3
 
     # load edges to list of lists of out and in neighbors
@@ -71,19 +88,18 @@ def load_graph(input_filename, true_partition_available):
     for i in range(N):
         in_neighbors[i] = np.array(in_neighbors[i], dtype=int)
 
-    # find number of nodes and edges
-    N = len(out_neighbors)
-    E = sum(len(v) for v in out_neighbors)
+    E = sum(len(v) for v in out_neighbors)  # number of edges
 
-    if true_partition_available:
-        true_b = np.zeros(len(out_neighbors), dtype=int)
+    if load_true_partition:
         # read the entire true partition CSV into rows of partitions
-        true_b_rows = pd.read_csv('{}_truePartition.tsv'.format(input_filename), delimiter='\t', header=None).as_matrix()
+        true_b_rows = pd.read_csv('{}_truePartition.tsv'.format(input_filename), delimiter='\t',
+                                  header=None).as_matrix()
+        true_b = np.ones(true_b_rows.shape[0], dtype=int) * -1  # initialize truth assignment to -1 for 'unknown'
         for i in range(true_b_rows.shape[0]):
             true_b[true_b_rows[i, 0] - 1] = int(
                 true_b_rows[i, 1] - 1)  # -1 since Python is 0-indexed and the TSV is 1-indexed
 
-    if true_partition_available:
+    if load_true_partition:
         return out_neighbors, in_neighbors, N, E, true_b
     else:
         return out_neighbors, in_neighbors, N, E
@@ -121,7 +137,7 @@ def initialize_partition_variables():
     old_d_in = [[], [], []]  # in block degrees for the high, best, and low number of blocks so far
     old_S = [np.Inf, np.Inf, np.Inf] # overall entropy for the high, best, and low number of blocks so far
     old_B = [[], [], []]  # number of blocks for the high, best, and low number of blocks so far
-    graph_object = []
+    graph_object = None
     return optimal_B_found, old_b, old_M, old_d, old_d_out, old_d_in, old_S, old_B, graph_object
 
 
@@ -850,7 +866,7 @@ def prepare_for_partition_on_next_num_blocks(S, b, M, d, d_out, d_in, B, old_b, 
     return b, M, d, d_out, d_in, B, B_to_merge, old_b, old_M, old_d, old_d_out, old_d_in, old_S, old_B, optimal_B_found
 
 
-def plot_graph_with_partition(out_neighbors, b, graph_object=[]):
+def plot_graph_with_partition(out_neighbors, b, graph_object=None, pos=None):
     """Plot the graph with force directed layout and color/shape each node according to its block assignment
 
         Parameters
@@ -862,56 +878,70 @@ def plot_graph_with_partition(out_neighbors, b, graph_object=[]):
                     array of block assignment for each node
         graph_object : graph tool object, optional
                     if a graph object already exists, use it to plot the graph
+        pos : ndarray (float) shape = (#nodes, 2), optional
+                    if node positions are given, plot the graph using them
 
         Returns
         -------
         graph_object : graph tool object
                     the graph tool object containing the graph and the node position info"""
 
-    if use_graph_tool_options:  # nothing is done if the graph tool option is off
-        if len(out_neighbors) <= 5000:
-            if graph_object == []:
-                graph_object = gt.Graph()
-                graph_object.add_edge_list([(i,j) for i in range(len(out_neighbors)) for j in out_neighbors[i][:,0]])
+    if len(out_neighbors) <= 5000:
+        if graph_object is None:
+            graph_object = gt.Graph()
+            edge_list = [(i, j) for i in range(len(out_neighbors)) if len(out_neighbors[i]) > 0 for j in
+                         out_neighbors[i][:, 0]]
+            graph_object.add_edge_list(edge_list)
+            if pos is None:
                 graph_object.vp['pos'] = gt.sfdp_layout(graph_object)
-            block_membership = graph_object.new_vertex_property("int")
-            vertex_shape = graph_object.new_vertex_property("int")
-            block_membership.a = b
-            vertex_shape.a = np.mod(block_membership.a,10)
-            gt.graph_draw(graph_object, inline=True, output_size=(600,600), pos=graph_object.vp['pos'], vertex_shape=vertex_shape,
-                          vertex_fill_color=block_membership, edge_pen_width=0.3, edge_marker_size=4)
-        else:
-            print('That\'s a big graph!')
+            else:
+                graph_object.vp['pos'] = graph_object.new_vertex_property("vector<float>")
+                for v in graph_object.vertices():
+                    graph_object.vp['pos'][v] = pos[graph_object.vertex_index[v], :]
+        block_membership = graph_object.new_vertex_property("int")
+        vertex_shape = graph_object.new_vertex_property("int")
+        block_membership.a = b[0:len(out_neighbors)]
+        vertex_shape.a = np.mod(block_membership.a, 10)
+        gt.graph_draw(graph_object, inline=True, output_size=(400, 400), pos=graph_object.vp['pos'],
+                      vertex_shape=vertex_shape,
+                      vertex_fill_color=block_membership, edge_pen_width=0.1, edge_marker_size=1, vertex_size=7)
+    else:
+        print('That\'s a big graph!')
     return graph_object
 
 
 def evaluate_partition(true_b, alg_b):
     """Evaluate the output partition against the truth partition and report the correctness metrics.
+       Compare the partitions using only the nodes that have known truth block assignment.
 
         Parameters
         ----------
         true_b : ndarray (int)
-                    array of truth block assignment for each node
+                array of truth block assignment for each node. If the truth block is not known for a node, -1 is used
+                to indicate unknown blocks.
         alg_b : ndarray (int)
-                    array of output block assignment for each node"""
+                array of output block assignment for each node. The length of this array corresponds to the number of
+                nodes observed and processed so far."""
 
     blocks_b1 = true_b
-    B_b1 = len(set(blocks_b1))
+    blocks_b1_set = set(true_b)
+    blocks_b1_set.discard(-1)  # -1 is the label for 'unknown'
+    B_b1 = len(blocks_b1_set)
 
     blocks_b2 = alg_b
     B_b2 = max(blocks_b2) + 1
 
-    N = len(true_b)
-
     print('\nPartition Correctness Evaluation\n')
-    print('Number of nodes: {}'.format(N))
-    print('Number of partitions in partition 1: {}'.format(B_b1))
-    print('Number of partitions in partition 2: {}'.format(B_b2))
+    print('Number of nodes: {}'.format(len(alg_b)))
+    print('Number of partitions in truth partition: {}'.format(B_b1))
+    print('Number of partitions in alg. partition: {}'.format(B_b2))
 
     # populate the confusion matrix between the two partitions
     contingency_table = np.zeros((B_b1, B_b2))
-    for i in range(0, N):
-        contingency_table[blocks_b1[i], blocks_b2[i]] += 1
+    for i in range(len(alg_b)):  # evaluation based on nodes observed so far
+        if true_b[i] != -1:  # do not include nodes without truth in the evaluation
+            contingency_table[blocks_b1[i], blocks_b2[i]] += 1
+    N = contingency_table.sum()
 
     # associate the labels between two partitions using linear assignment
     assignment = Munkres()  # use the Hungarian algorithm / Kuhn-Munkres algorithm
@@ -941,6 +971,7 @@ def evaluate_partition(true_b, alg_b):
     # Compute pair-counting-based metrics
     def nchoose2(a):
         return misc.comb(a, 2)
+
     num_pairs = nchoose2(N)
     colsum = np.sum(contingency_table, axis=0)
     rowsum = np.sum(contingency_table, axis=1)
@@ -962,7 +993,7 @@ def evaluate_partition(true_b, alg_b):
     sum_colsum_choose_2 = sum(vectorized_nchoose2(colsum))
     sum_rowsum_choose_2 = sum(vectorized_nchoose2(rowsum))
     adjusted_rand_index = (sum_table_choose_2 - sum_rowsum_choose_2 * sum_colsum_choose_2 / num_pairs) / (
-    0.5 * (sum_rowsum_choose_2 + sum_colsum_choose_2) - sum_rowsum_choose_2 * sum_colsum_choose_2 / num_pairs)
+        0.5 * (sum_rowsum_choose_2 + sum_colsum_choose_2) - sum_rowsum_choose_2 * sum_colsum_choose_2 / num_pairs)
     print('Rand Index: {}'.format(rand_index))
     print('Adjusted Rand Index: {}'.format(adjusted_rand_index))
     print('Pairwise Recall: {}'.format(num_agreement_same / (num_same_in_b1)))
@@ -972,13 +1003,16 @@ def evaluate_partition(true_b, alg_b):
     # compute the information theoretic metrics
     marginal_prob_b2 = np.sum(joint_prob, 0)
     marginal_prob_b1 = np.sum(joint_prob, 1)
-    conditional_prob_b2_b1 = joint_prob / marginal_prob_b1[:, None]
-    conditional_prob_b1_b2 = joint_prob / marginal_prob_b2[None, :]
+    idx1 = np.nonzero(marginal_prob_b1)
+    idx2 = np.nonzero(marginal_prob_b2)
+    conditional_prob_b2_b1 = np.zeros(joint_prob.shape)
+    conditional_prob_b1_b2 = np.zeros(joint_prob.shape)
+    conditional_prob_b2_b1[idx1, :] = joint_prob[idx1, :] / marginal_prob_b1[idx1, None]
+    conditional_prob_b1_b2[:, idx2] = joint_prob[:, idx2] / marginal_prob_b2[None, idx2]
     # compute entropy of the non-partition2 and the partition2 version
-    idx = np.nonzero(marginal_prob_b2)
-    H_b2 = -np.sum(marginal_prob_b2[idx] * np.log(marginal_prob_b2[idx]))
-    idx = np.nonzero(marginal_prob_b1)
-    H_b1 = -np.sum(marginal_prob_b1[idx] * np.log(marginal_prob_b1[idx]))
+    H_b2 = -np.sum(marginal_prob_b2[idx2] * np.log(marginal_prob_b2[idx2]))
+    H_b1 = -np.sum(marginal_prob_b1[idx1] * np.log(marginal_prob_b1[idx1]))
+
     # compute the conditional entropies
     idx = np.nonzero(joint_prob)
     H_b2_b1 = -np.sum(np.sum(joint_prob[idx] * np.log(conditional_prob_b2_b1[idx])))
@@ -986,10 +1020,19 @@ def evaluate_partition(true_b, alg_b):
     # compute the mutual information (symmetric)
     marginal_prod = np.dot(marginal_prob_b1[:, None], np.transpose(marginal_prob_b2[:, None]))
     MI_b1_b2 = np.sum(np.sum(joint_prob[idx] * np.log(joint_prob[idx] / marginal_prod[idx])))
-    print('Entropy of partition 1: {}'.format(H_b1))
-    print('Entropy of partition 2: {}'.format(H_b2))
-    print('Conditional entropy of partition 1 given partition 2: {}'.format(H_b1_b2))
-    print('Conditional entropy of partition 2 given partition 1: {}'.format(H_b2_b1))
-    print('Mututal informationion between partition 1 and partition 2: {}'.format(MI_b1_b2))
-    print('Fraction of missed information: {}'.format(H_b1_b2 / H_b1))
-    print('Fraction of erroneous information: {}'.format(H_b2_b1 / H_b2))
+
+    if H_b1 > 0:
+        fraction_missed_info = H_b1_b2 / H_b1
+    else:
+        fraction_missed_info = 0
+    if H_b2 > 0:
+        fraction_err_info = H_b2_b1 / H_b2
+    else:
+        fraction_err_info = 0
+    print('Entropy of truth partition: {}'.format(abs(H_b1)))
+    print('Entropy of alg. partition: {}'.format(abs(H_b2)))
+    print('Conditional entropy of truth partition given alg. partition: {}'.format(abs(H_b1_b2)))
+    print('Conditional entropy of alg. partition given truth partition: {}'.format(abs(H_b2_b1)))
+    print('Mututal informationion between truth partition and alg. partition: {}'.format(abs(MI_b1_b2)))
+    print('Fraction of missed information: {}'.format(abs(fraction_missed_info)))
+    print('Fraction of erroneous information: {}'.format(abs(fraction_err_info)))
