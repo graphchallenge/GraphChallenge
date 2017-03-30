@@ -16,4 +16,4 @@ graph_tool_partition = gt.minimize_blockmodel_dl(input_graph, mcmc_args={'parall
                                                  mcmc_equilibrate_args={'verbose':False, 'epsilon':1e-4}, verbose=True)
 t1 = timeit.default_timer()
 print('\nGraph partition took {} seconds'.format(t1-t0))
-evaluate_partition(true_partition, graph_tool_partition.get_blocks())
+evaluate_partition(true_partition, graph_tool_partition.get_blocks().a)
