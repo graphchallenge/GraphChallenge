@@ -11,6 +11,7 @@ E_expected =  [1  1  0  0  0
                0  0  0  0  0]
 
 
+E = ktruss(inc_mtx_file, 3, time = false)
 @time E = ktruss(inc_mtx_file, 3)
 
 if sum( E - E_expected ) > 0
