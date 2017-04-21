@@ -1,5 +1,5 @@
 
-include("ktruss.jl");
+include("ktruss.jl")
 
 inc_mtx_file = "../../../data/ktruss_example.tsv"
 
@@ -8,16 +8,16 @@ E_expected =  [1  1  0  0  0
                1  0  0  1  0
                0  0  1  1  0
                1  0  1  0  0
-               0  0  0  0  0];
+               0  0  0  0  0]
 
 
-@time E = ktruss(inc_mtx_file, 3);
+@time E = ktruss(inc_mtx_file, 3)
 
 if sum( E - E_expected ) > 0
-    println("Unable to verify results");
+    println("Unable to verify results")
 else
-    println("passed");
-    println(E);
+    println("passed")
+    println(E)
 end
 
 #######################################################
