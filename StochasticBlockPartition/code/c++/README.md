@@ -8,7 +8,7 @@ The official graph-tool website is https://graph-tool.skewed.de/ and documentati
 
 ## Running this C++ implementation
 
-To run this C++ implementation, simply install the graph-tool module, and run the example Python script included here: "run_graph_tool_partition_alg_main"
+To run this C++ implementation, simply install the graph-tool module, and run the example Python script included here: "run_graph_tool_partition_alg_main" with the appropriate arguments. For example: "python run_graph_tool_partition_alg_main.py ../../data/static/simulated_blockmodel_graph_5000_nodes" partitions the static graph with 5000 nodes and "python run_graph_tool_partition_alg_main.py ../../data/streaming/emergingEdges/500_nodes/simulated_blockmodel_graph_500_nodes_edgeSample -p 7" partitions stage 7 of the streaming graph with emerging edges.
 
 The following Python modules are required for running this script:
 
