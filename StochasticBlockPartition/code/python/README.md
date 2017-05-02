@@ -9,8 +9,7 @@ For clarity and simplicity, here is a pure Python implementation of the baseline
 ### Python files
 - partition_baseline_support.py : Source code for all the supporting functions of the graph partitioning algorithm, with functional documentation detailiong all the inputs and outputs 
 
-- partition_baseline_main.py : Source code for the main routine that invokes the supporting functions to perform graph partitioning
-
+- partition_baseline_main.py : Source code for the main routine that invokes the supporting functions to perform graph partitioning. Arguments may be passed to specify the data set and streaming stage to process. For example: "python partition_baseline_main.py ../../data/static/simulated_blockmodel_graph_5000_nodes" partitions the static graph with 5000 nodes and "python partition_baseline_main.py ../../data/streaming/emergingEdges/500_nodes/simulated_blockmodel_graph_500_nodes_edgeSample -p 7" partitions stage 7 of the streaming graph with emerging edges.
 
 ## Version
 The source code is run and tested using Python 2.7
