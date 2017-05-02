@@ -2,13 +2,31 @@ from partition_baseline_support import *
 use_timeit = True # for timing runs (optional)
 if use_timeit:
     import timeit
+import os, sys, argparse
 
-input_filename = '../../data/static/simulated_blockmodel_graph_5000_nodes'
+parser = argparse.ArgumentParser()
+parser.add_argument("-p", "--parts", type=int, required=False)
+parser.add_argument("input_filename", nargs="?", type=str, default="../../data/static/simulated_blockmodel_graph_500_nodes")
+args = parser.parse_args()
+
+input_filename = args.input_filename
 true_partition_available = True
 visualize_graph = False  # whether to plot the graph layout colored with intermediate partitions
 verbose = True  # whether to print updates of the partitioning
 
-out_neighbors, in_neighbors, N, E, true_partition = load_graph(input_filename, true_partition_available)
+if not os.path.isfile(input_filename + '.tsv') and not os.path.isfile(input_filename + '_1.tsv'):
+	print("File doesn't exist: '{}'!".format(input_filename))
+	sys.exit(1)
+
+if args.parts >= 1:
+	print('\nLoading partition 1 of {} ({}) ...'.format(args.parts, input_filename + "_1.tsv"))
+	out_neighbors, in_neighbors, N, E, true_partition = load_graph(input_filename, load_true_partition=true_partition_available, strm_piece_num=1)
+	for part in xrange(2, args.parts + 1):
+		print('Loading partition {} of {} ({}) ...'.format(part, args.parts, input_filename + "_" + str(part) + ".tsv"))
+		out_neighbors, in_neighbors, N, E = load_graph(input_filename, load_true_partition=False, strm_piece_num=part, out_neighbors=out_neighbors, in_neighbors=in_neighbors)
+else:
+	out_neighbors, in_neighbors, N, E, true_partition = load_graph(input_filename, load_true_partition=true_partition_available)
+
 if verbose:
     print('Number of nodes: {}'.format(N))
     print('Number of edges: {}'.format(E))

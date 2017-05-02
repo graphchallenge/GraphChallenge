@@ -84,9 +84,15 @@ def load_graph(input_filename, load_true_partition, strm_piece_num=None, out_nei
 
     # convert each neighbor list to neighbor numpy arrays for faster access
     for i in range(N):
-        out_neighbors[i] = np.array(out_neighbors[i], dtype=int)
+        if len(out_neighbors[i]) > 0:
+            out_neighbors[i] = np.array(out_neighbors[i], dtype=int)
+        else:
+            out_neighbors[i] = np.array(out_neighbors[i], dtype=int).reshape((0,2))
     for i in range(N):
-        in_neighbors[i] = np.array(in_neighbors[i], dtype=int)
+        if len(in_neighbors[i]) > 0:
+            in_neighbors[i] = np.array(in_neighbors[i], dtype=int)
+        else:
+            in_neighbors[i] = np.array(in_neighbors[i], dtype=int).reshape((0,2))
 
     E = sum(len(v) for v in out_neighbors)  # number of edges
 
@@ -177,10 +183,11 @@ def initialize_edge_counts(out_neighbors, B, b, use_sparse):
         M = np.zeros((B, B), dtype=int)
     # compute the initial interblock edge count
     for v in range(len(out_neighbors)):
-        k1 = b[v]
-        k2, inverse_idx = np.unique(b[out_neighbors[v][:, 0]], return_inverse=True)
-        count = np.bincount(inverse_idx, weights=out_neighbors[v][:, 1]).astype(int)
-        M[k1, k2] += count
+        if len(out_neighbors[v]) > 0:
+            k1 = b[v]
+            k2, inverse_idx = np.unique(b[out_neighbors[v][:, 0]], return_inverse=True)
+            count = np.bincount(inverse_idx, weights=out_neighbors[v][:, 1]).astype(int)
+            M[k1, k2] += count
     # compute initial block degrees
     d_out = np.asarray(M.sum(axis=1)).ravel()
     d_in = np.asarray(M.sum(axis=0)).ravel()
@@ -840,6 +847,8 @@ def prepare_for_partition_on_next_num_blocks(S, b, M, d, d_out, d_in, B, old_b, 
     # find the next number of blocks to try using golden ratio bisection
     if old_S[2] == np.Inf:  # if the three points in the golden ratio bracket has not yet been established
         B_to_merge = int(B*B_rate)
+        if (B_to_merge==0): # not enough number of blocks to merge so done
+            optimal_B_found = True
         b = old_b[1].copy()
         M = old_M[1].copy()
         d = old_d[1].copy()
