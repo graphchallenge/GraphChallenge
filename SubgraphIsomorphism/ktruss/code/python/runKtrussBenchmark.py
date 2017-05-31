@@ -1,20 +1,22 @@
 import numpy as np
 import scipy as sp
 from ktruss import ktruss
+import os, sys, argparse
 
 #Use the pandas package if available
 #import pandas as pd
 
-inc_mtx_file = '../../../data/ktruss_example.tsv';
+parser = argparse.ArgumentParser()
+parser.add_argument("input_filename", nargs="?", action="store", type=str, default="../../../data/ktruss_example.tsv")
+args = parser.parse_args()
 
-E_expected=np.array([ (1, 1, 0 ,0 ,0), (0, 1, 1 ,0 ,0), (1, 0,0,1,0),(0,0,1,1,0),(1,0,1,0,0),(0,0,0,0,0) ])
+inc_mtx_file = args.input_filename
+
+if not os.path.isfile(inc_mtx_file):
+	print("File doesn't exist: '{}'!".format(inc_mtx_file))
+	sys.exit(1)
 
 E=ktruss(inc_mtx_file,3)
-
-if sum(sum(E.toarray()-E_expected)):
-    print "unable to verify"
-else:
-    print E
 
 ###################################################
 # Graph Challenge benchmark
