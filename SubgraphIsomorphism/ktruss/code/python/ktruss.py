@@ -7,6 +7,7 @@ from scipy.sparse import lil_matrix
 import time
 #Use the pandas package if available
 #import pandas as pd
+#import pdb ; pdb.set_trace()
 
 import scipy.io as sio
 
@@ -78,11 +79,13 @@ def ktruss (inc_mat_file,k):
 	x=sp.sparse.find(xc==0)[0]
 	#x=np.where(xc==0)[0]
         set_zero_rows(E, x)
-        E.eliminate_zeros()
+        E=(E>0).astype(int)
+	#E.eliminate_zeros()
         tmp=np.transpose(E)*E
         (tmp).setdiag(np.zeros(np.shape(tmp)[0]),k=0)
         tmp.eliminate_zeros()
-        s=csr_matrix(((R==2).astype(float)).sum(axis=1))
+        R=E*tmp
+	s=csr_matrix(((R==2).astype(float)).sum(axis=1))
         xc= (s >=k-2).astype(int)
 
     ktrussTime=time.clock()

@@ -18,6 +18,7 @@ if not os.path.isfile(inc_mtx_file):
 
 E=ktruss(inc_mtx_file,3)
 
+
 ###################################################
 # Graph Challenge benchmark
 # Developer: Dr. Vijay Gadepally (vijayg@mit.edu)
