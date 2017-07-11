@@ -13,8 +13,7 @@ function triangle(adj_mtx_file)
     println("sparse adj. matrix creation time : ", t_create_adj);
     
     tic;
-    C = A*A;
-    nt = sum(C.*A)/6;
+    nt = sum( A^2 .*  A )/6;
     t = toc;
     println("triangle count time : ", t);
     println("number of triangles : ", nt);
