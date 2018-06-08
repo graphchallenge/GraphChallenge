@@ -181,12 +181,15 @@ while not optimal_num_blocks_found:
                     num_in_neighbor_edges, num_neighbor_edges)
 
                 # compute the Hastings correction
-                Hastings_correction = compute_Hastings_correction(blocks_out, count_out, blocks_in, count_in, proposal,
-                                                                  interblock_edge_count,
-                                                                  new_interblock_edge_count_current_block_row,
-                                                                  new_interblock_edge_count_current_block_col,
-                                                                  num_blocks, block_degrees,
-                                                                  block_degrees_new, use_sparse_matrix)
+                if num_neighbor_edges>0:
+                    Hastings_correction = compute_Hastings_correction(blocks_out, count_out, blocks_in, count_in, proposal,
+                                                                      interblock_edge_count,
+                                                                      new_interblock_edge_count_current_block_row,
+                                                                      new_interblock_edge_count_current_block_col,
+                                                                      num_blocks, block_degrees,
+                                                                      block_degrees_new, use_sparse_matrix)
+                else: # if the node is an island, proposal is random and symmetric
+                    Hastings_correction = 1
 
                 # compute change in entropy / posterior
                 delta_entropy = compute_delta_entropy(current_block, proposal, interblock_edge_count,

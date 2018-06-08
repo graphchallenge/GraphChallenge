@@ -242,6 +242,9 @@ def propose_new_partition(r, neighbors_out, neighbors_in, b, M, d, B, agg_move, 
     k_out = sum(neighbors_out[:,1])
     k_in = sum(neighbors_in[:,1])
     k = k_out + k_in
+    if k==0: # this node has no neighbor, simply propose a block randomly
+        s = np.random.randint(B)
+        return s, k_out, k_in, k
     rand_neighbor = np.random.choice(neighbors[:,0], p=neighbors[:,1]/float(k))
     u = b[rand_neighbor]
     # propose a new block randomly
