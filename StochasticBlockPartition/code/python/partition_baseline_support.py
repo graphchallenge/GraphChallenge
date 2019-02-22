@@ -545,7 +545,7 @@ def compute_delta_entropy(r, s, M, M_r_row, M_s_row, M_r_col, M_s_col, d_out, d_
         M_t2_s = M[:, s]
 
     # remove r and s from the cols to avoid double counting
-    idx = range(len(d_in_new))
+    idx = list(range(len(d_in_new)))
     del idx[max(r, s)]
     del idx[min(r, s)]
     M_r_col = M_r_col[idx]

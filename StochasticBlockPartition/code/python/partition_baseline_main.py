@@ -21,7 +21,7 @@ if not os.path.isfile(input_filename + '.tsv') and not os.path.isfile(input_file
 if args.parts >= 1:
 	print('\nLoading partition 1 of {} ({}) ...'.format(args.parts, input_filename + "_1.tsv"))
 	out_neighbors, in_neighbors, N, E, true_partition = load_graph(input_filename, load_true_partition=true_partition_available, strm_piece_num=1)
-	for part in xrange(2, args.parts + 1):
+	for part in range(2, args.parts + 1):
 		print('Loading partition {} of {} ({}) ...'.format(part, args.parts, input_filename + "_" + str(part) + ".tsv"))
 		out_neighbors, in_neighbors, N, E = load_graph(input_filename, load_true_partition=False, strm_piece_num=part, out_neighbors=out_neighbors, in_neighbors=in_neighbors)
 else:
