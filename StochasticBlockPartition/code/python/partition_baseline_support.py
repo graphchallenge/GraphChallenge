@@ -200,7 +200,7 @@ def initialize_edge_counts(out_neighbors, B, b, use_sparse):
     return M, d_out, d_in, d
 
 
-def propose_new_partition(r, neighbors_out, neighbors_in, b, M, d, B, agg_move, use_sparse):
+def propose_new_partition(r, neighbors_out, neighbors_in, b, partition: Partition, agg_move, use_sparse):
     """Propose a new block assignment for the current node or block
 
         Parameters
@@ -213,12 +213,8 @@ def propose_new_partition(r, neighbors_out, neighbors_in, b, M, d, B, agg_move, 
                     in neighbors array where the first column is the node indices and the second column is the edge weight
         b : ndarray (int)
                     array of block assignment for each node
-        M : ndarray or sparse matrix (int), shape = (#blocks, #blocks)
-                    edge count matrix between all the blocks.
-        d : ndarray (int)
-                    total number of edges to and from each block
-        B : int
-                    total number of blocks
+        partition : Partition
+                    the current partitioning results
         agg_move : bool
                     whether the proposal is a block move
         use_sparse : bool
@@ -241,34 +237,34 @@ def propose_new_partition(r, neighbors_out, neighbors_in, b, M, d, B, agg_move, 
 
         Randomly select a neighbor of the current node, and obtain its block assignment u. With probability \frac{B}{d_u + B}, randomly propose
         a block. Otherwise, randomly selects a neighbor to block u and propose its block assignment. For block (agglomerative) moves,
-        avoid proposing the current block."""
-
+        avoid proposing the current block.
+    """
     neighbors = np.concatenate((neighbors_out, neighbors_in))
     k_out = sum(neighbors_out[:,1])
     k_in = sum(neighbors_in[:,1])
     k = k_out + k_in
     if k==0: # this node has no neighbor, simply propose a block randomly
-        s = np.random.randint(B)
+        s = np.random.randint(partition.num_blocks)
         return s, k_out, k_in, k
     rand_neighbor = np.random.choice(neighbors[:,0], p=neighbors[:,1]/float(k))
     u = b[rand_neighbor]
     # propose a new block randomly
-    if np.random.uniform() <= B/float(d[u]+B):  # chance inversely prop. to block_degree
+    if np.random.uniform() <= partition.num_blocks/float(partition.block_degrees[u]+partition.num_blocks):  # chance inversely prop. to block_degree
         if agg_move:  # force proposal to be different from current block
-            candidates = set(range(B))
+            candidates = set(range(partition.num_blocks))
             candidates.discard(r)
             s = np.random.choice(list(candidates))
         else:
-            s = np.random.randint(B)
+            s = np.random.randint(partition.num_blocks)
     else:  # propose by random draw from neighbors of block partition[rand_neighbor]
         if use_sparse:
-            multinomial_prob = (M[u, :].toarray().transpose() + M[:, u].toarray()) / float(d[u])
+            multinomial_prob = (partition.interblock_edge_count[u, :].toarray().transpose() + partition.interblock_edge_count[:, u].toarray()) / float(partition.block_degrees[u])
         else:
-            multinomial_prob = (M[u, :].transpose() + M[:, u]) / float(d[u])
+            multinomial_prob = (partition.interblock_edge_count[u, :].transpose() + partition.interblock_edge_count[:, u]) / float(partition.block_degrees[u])
         if agg_move:  # force proposal to be different from current block
             multinomial_prob[r] = 0
             if multinomial_prob.sum() == 0:  # the current block has no neighbors. randomly propose a different block
-                candidates = set(range(B))
+                candidates = set(range(partition.num_blocks))
                 candidates.discard(r)
                 s = np.random.choice(list(candidates))
                 return s, k_out, k_in, k

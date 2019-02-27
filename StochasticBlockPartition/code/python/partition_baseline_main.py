@@ -41,10 +41,6 @@ if __name__ == "__main__":
     if use_timeit:
         t0 = timeit.default_timer()
 
-    # initialize by putting each node in its own block (N blocks)
-    # num_blocks = N
-    # block_assignment = np.array(range(num_blocks))
-
     # partition update parameters
     beta = 3  # exploitation versus exploration (higher value favors exploitation)
     use_sparse_matrix = False  # whether to represent the edge count matrix using sparse matrix
@@ -63,22 +59,15 @@ if __name__ == "__main__":
     delta_entropy_threshold2 = 1e-4  # threshold after the golden ratio bracket is established (typically lower to fine-tune to partition)
     delta_entropy_moving_avg_window = 3  # width of the moving average window for the delta entropy convergence criterion
 
-    # initialize edge counts and block degrees
-    # interblock_edge_count, block_degrees_out, block_degrees_in, block_degrees = initialize_edge_counts(out_neighbors,
-    #                                                                                                 partition.num_blocks,
-    #                                                                                                 partition.block_assignment,
-    #                                                                                                 use_sparse_matrix)
-
     # initialize items before iterations to find the partition with the optimal number of blocks
     partition_triplet, graph_object = initialize_partition_variables()
-    # optimal_num_blocks_found, old_block_assignment, old_interblock_edge_count, old_block_degrees, old_block_degrees_out, old_block_degrees_in, old_overall_entropy, old_num_blocks, graph_object = initialize_partition_variables()
     num_blocks_to_merge = int(partition.num_blocks * num_block_reduction_rate)
 
     # begin partitioning by finding the best partition with the optimal number of blocks
-    ##################
-    # BLOCK MERGING
-    ##################
     while not partition_triplet.optimal_num_blocks_found:
+        ##################
+        # BLOCK MERGING
+        ##################
         # begin agglomerative partition updates (i.e. block merging)
         if verbose:
             print("\nMerging down blocks from {} to {}".format(partition.num_blocks, partition.num_blocks - num_blocks_to_merge))
@@ -107,8 +96,7 @@ if __name__ == "__main__":
 
                 # propose a new block to merge with
                 proposal, num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges = propose_new_partition(
-                    current_block, out_blocks, in_blocks, block_partition, partition.interblock_edge_count, partition.block_degrees, partition.num_blocks,
-                    1, use_sparse_matrix)
+                    current_block, out_blocks, in_blocks, block_partition, partition, True, use_sparse_matrix)
 
                 # compute the two new rows and columns of the interblock edge count matrix
                 new_interblock_edge_count_current_block_row, new_interblock_edge_count_new_block_row, new_interblock_edge_count_current_block_col, new_interblock_edge_count_new_block_col = \
@@ -172,7 +160,7 @@ if __name__ == "__main__":
                 # propose a new block for this node
                 proposal, num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges = propose_new_partition(
                     current_block, out_neighbors[current_node], in_neighbors[current_node], partition.block_assignment,
-                    partition.interblock_edge_count, partition.block_degrees, partition.num_blocks, 0, use_sparse_matrix)
+                    partition, False, use_sparse_matrix)
 
                 # determine whether to accept or reject the proposal
                 if (proposal != current_block):
