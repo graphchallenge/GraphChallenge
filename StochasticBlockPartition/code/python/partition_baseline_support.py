@@ -7,7 +7,9 @@
         .. [2] Peixoto, Tiago P. 'Parsimonious module inference in large networks.'
                Physical review letters 110, no. 14 (2013): 148701.
         .. [3] Karrer, Brian, and Mark EJ Newman. 'Stochastic blockmodels and community structure in networks.'
-               Physical Review E 83, no. 1 (2011): 016107."""
+               Physical Review E 83, no. 1 (2011): 016107.
+"""
+
 import pandas as pd
 import numpy as np
 from scipy import sparse as sparse
@@ -16,6 +18,8 @@ from munkres import Munkres # for correctness evaluation
 use_graph_tool_options = False # for visualiziing graph partitions (optional)
 if use_graph_tool_options:
     import graph_tool.all as gt
+
+from partition import Partition, PartitionTriplet
 
 
 def load_graph(input_filename, load_true_partition, strm_piece_num=None, out_neighbors=None, in_neighbors=None):
@@ -115,6 +119,14 @@ def initialize_partition_variables():
     """Initialize variables for the iterations to find the best partition with the optimal number of blocks
 
         Returns
+        ------
+        partition: PartitionTriplet
+                    empty partition triplet, stores the 3 best partitions for Fibonacci search
+        graph_object : list
+                    empty for now and will store the graph object if graphs will be visualized
+
+
+        Previous Returns
         -------
         optimal_B_found : bool
                     flag for whether the optimal block has been found
@@ -133,18 +145,11 @@ def initialize_partition_variables():
         old_B : list of length 3
                     holds the number of blocks for the best three partitions so far
         graph_object : list
-                    empty for now and will store the graph object if graphs will be visualized"""
-
-    optimal_B_found = False
-    old_b = [[], [], []]  # partition for the high, best, and low number of blocks so far
-    old_M = [[], [], []]  # edge count matrix for the high, best, and low number of blocks so far
-    old_d = [[], [], []]  # block degrees for the high, best, and low number of blocks so far
-    old_d_out = [[], [], []]  # out block degrees for the high, best, and low number of blocks so far
-    old_d_in = [[], [], []]  # in block degrees for the high, best, and low number of blocks so far
-    old_S = [np.Inf, np.Inf, np.Inf] # overall entropy for the high, best, and low number of blocks so far
-    old_B = [[], [], []]  # number of blocks for the high, best, and low number of blocks so far
+                    empty for now and will store the graph object if graphs will be visualized
+    """
+    triplet = PartitionTriplet()
     graph_object = None
-    return optimal_B_found, old_b, old_M, old_d, old_d_out, old_d_in, old_S, old_B, graph_object
+    return triplet, graph_object
 
 
 def initialize_edge_counts(out_neighbors, B, b, use_sparse):
@@ -739,15 +744,26 @@ def compute_overall_entropy(M, d_out, d_in, B, N, E, use_sparse):
     return S
 
 
-def prepare_for_partition_on_next_num_blocks(S, b, M, d, d_out, d_in, B, old_b, old_M, old_d, old_d_out, old_d_in,
-                                             old_S, old_B, B_rate):
+def prepare_for_partition_on_next_num_blocks(partition: Partition, partition_triplet: PartitionTriplet, B_rate):
     """Checks to see whether the current partition has the optimal number of blocks. If not, the next number of blocks
        to try is determined and the intermediate variables prepared.
 
         Parameters
         ----------
-        S : float
-                the overall entropy of the current partition
+        partition : Partition
+                the most recent partitioning results
+        partition_triplet : Partition
+                the triplet of the three best partitioning results for Fibonacci search
+
+        Returns:
+        ----------
+        partition : Partition
+                the partitioning results to use for the next iteration of the algorithm
+        partition_triplet : Partition
+                the updated triplet of the three best partitioning results for Fibonacci search
+
+        Old Parameters
+        ----------
         b : ndarray (int)
                     current array of block assignment for each node
         M : ndarray or sparse matrix (int), shape = (#blocks, #blocks)
@@ -777,7 +793,7 @@ def prepare_for_partition_on_next_num_blocks(S, b, M, d, d_out, d_in, B, old_b, 
         B_rate : float
                     the ratio on the number of blocks to reduce before the golden ratio bracket is established
 
-        Returns
+        Old Returns
         -------
         b : ndarray (int)
                 starting array of block assignment on each node for the next number of blocks to try
@@ -817,65 +833,45 @@ def prepare_for_partition_on_next_num_blocks(S, b, M, d, d_out, d_in, B, old_b, 
         blocks is reduced by a fixed rate until the golden ratio bracket (three best partitions with the middle one
         being the best) is established. Once the golden ratio bracket is established, perform golden ratio search until
         the bracket is narrowed to consecutive number of blocks where the middle one is identified as the optimal
-        number of blocks."""
+        number of blocks.
+    """
 
     optimal_B_found = False
     B_to_merge = 0
 
-    # update the best three partitions so far and their statistics
-    if S <= old_S[1]:  # if the current partition is the best so far
-        # if the current number of blocks is smaller than the previous best number of blocks
-        old_index = 0 if old_B[1] > B else 2
-        old_b[old_index] = old_b[1]
-        old_M[old_index] = old_M[1]
-        old_d[old_index] = old_d[1]
-        old_d_out[old_index] = old_d_out[1]
-        old_d_in[old_index] = old_d_in[1]
-        old_S[old_index] = old_S[1]
-        old_B[old_index] = old_B[1]
-
-        index = 1
-    else:  # the current partition is not the best so far
-        # if the current number of blocks is smaller than the best number of blocks so far
-        index = 2 if old_B[1] > B else 0
-
-    old_b[index] = b
-    old_M[index] = M
-    old_d[index] = d
-    old_d_out[index] = d_out
-    old_d_in[index] = d_in
-    old_S[index] = S
-    old_B[index] = B
+    partition_triplet.update(partition)
 
     # find the next number of blocks to try using golden ratio bisection
-    if old_S[2] == np.Inf:  # if the three points in the golden ratio bracket has not yet been established
-        B_to_merge = int(B*B_rate)
+    if partition_triplet.overall_entropy[2] == np.Inf:  # if the three points in the golden ratio bracket has not yet been established
+        B_to_merge = int(partition.num_blocks*B_rate)
         if (B_to_merge==0): # not enough number of blocks to merge so done
             optimal_B_found = True
-        b = old_b[1].copy()
-        M = old_M[1].copy()
-        d = old_d[1].copy()
-        d_out = old_d_out[1].copy()
-        d_in = old_d_in[1].copy()
+        partition.block_assignment = partition_triplet.block_assignment[1].copy()
+        partition.interblock_edge_count = partition_triplet.interblock_edge_count[1].copy()
+        partition.block_degrees = partition_triplet.block_degrees[1].copy()
+        partition.block_degrees_out = partition_triplet.block_degrees_out[1].copy()
+        partition.block_degrees_in = partition_triplet.block_degrees_in[1].copy()
     else:  # golden ratio search bracket established
-        if old_B[0] - old_B[2] == 2:  # we have found the partition with the optimal number of blocks
+        if partition_triplet.num_blocks[0] - partition_triplet.num_blocks[2] == 2:  # we have found the partition with the optimal number of blocks
             optimal_B_found = True
-            B = old_B[1]
-            b = old_b[1]
+            partition.num_blocks = partition_triplet.num_blocks[1]
+            partition.block_assignment = partition_triplet.block_assignment[1]
         else:  # not done yet, find the next number of block to try according to the golden ratio search
-            if (old_B[0]-old_B[1]) >= (old_B[1]-old_B[2]):  # the higher segment in the bracket is bigger
+            if (partition_triplet.num_blocks[0]-partition_triplet.num_blocks[1]) >= (partition_triplet.num_blocks[1]-partition_triplet.num_blocks[2]):  # the higher segment in the bracket is bigger
                 index = 0
             else:  # the lower segment in the bracket is bigger
                 index = 1
-            next_B_to_try = old_B[index + 1] + np.round((old_B[index] - old_B[index + 1]) * 0.618).astype(int)
-            B_to_merge = old_B[index] - next_B_to_try
-            B = old_B[index]
-            b = old_b[index].copy()
-            M = old_M[index].copy()
-            d = old_d[index].copy()
-            d_out = old_d_out[index].copy()
-            d_in = old_d_in[index].copy()
-    return b, M, d, d_out, d_in, B, B_to_merge, old_b, old_M, old_d, old_d_out, old_d_in, old_S, old_B, optimal_B_found
+            next_B_to_try = partition_triplet.num_blocks[index + 1] + np.round((partition_triplet.num_blocks[index] - partition_triplet.num_blocks[index + 1]) * 0.618).astype(int)
+            B_to_merge = partition_triplet.num_blocks[index] - next_B_to_try
+            partition.num_blocks = partition_triplet.num_blocks[index]
+            partition.block_assignment = partition_triplet.block_assignment[index].copy()
+            partition.interblock_edge_count = partition_triplet.interblock_edge_count[index].copy()
+            partition.block_degrees = partition_triplet.block_degrees[index].copy()
+            partition.block_degrees_out = partition_triplet.block_degrees_out[index].copy()
+            partition.block_degrees_in = partition_triplet.block_degrees_in[index].copy()
+
+    partition_triplet.optimal_num_blocks_found = optimal_B_found
+    return partition, B_to_merge, partition_triplet
 
 
 def plot_graph_with_partition(out_neighbors, b, graph_object=None, pos=None):
