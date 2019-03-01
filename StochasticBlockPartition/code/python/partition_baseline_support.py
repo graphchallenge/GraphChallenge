@@ -22,6 +22,36 @@ if use_graph_tool_options:
 from partition import Partition, PartitionTriplet
 
 
+class EdgeCountUpdates(object):
+    """Holds the updates to the current interblock edge counts given a proposed block or node move.
+
+    Since a block move affects only the rows and columns for the original and proposed blocks, only four rows and
+    columns need to be stored for the edge count matrix updates.
+    """
+
+    def __init__(self, block_row: np.array, proposal_row: np.array, block_col: np.array,
+                 proposal_col: np.array) -> None:
+        """Creates a new EdgeCountUpdates object.
+
+            Parameters
+            ---------
+            block_row : np.array [int]
+                    the updates for the row of the current block
+            proposal_row : np.array [int]
+                    the updates for the row of the proposed block
+            block_col : np.array [int]
+                    the updates for the column of the current block
+            proposal_col : np.array [int]
+                    the updates for the column of the proposed block
+        """
+        self.block_row = block_row
+        self.proposal_row = proposal_row
+        self.block_col = block_col
+        self.proposal_col = proposal_col
+    # End of __init__()
+# End of EdgeCountUpdates()
+
+
 def load_graph(input_filename, load_true_partition, strm_piece_num=None, out_neighbors=None, in_neighbors=None):
     """Load the graph from a TSV file with standard format, and the truth partition if available
 
@@ -315,7 +345,8 @@ def compute_new_rows_cols_interblock_edge_count_matrix(M, r, s, b_out, count_out
 
         Notes
         -----
-        The updates only involve changing the entries to and from the neighboring blocks"""
+        The updates only involve changing the entries to and from the neighboring blocks
+    """
 
     B = M.shape[0]
     if agg_move:  # the r row and column are simply empty after this merge move
@@ -354,7 +385,9 @@ def compute_new_rows_cols_interblock_edge_count_matrix(M, r, s, b_out, count_out
     M_s_col[s, 0] += np.sum(count_out[np.where(b_out == s)])
     M_s_col[r, 0] -= count_self
     M_s_col[s, 0] += count_self
-    return M_r_row, M_s_row, M_r_col, M_s_col
+
+    return EdgeCountUpdates(M_r_row, M_s_row, M_r_col, M_s_col)
+# End of compute_new_rows_cols_interblock_edge_count_matrix()
 
 
 def compute_new_block_degrees(r, s, partition: Partition, k_out, k_in, k):
@@ -480,7 +513,7 @@ def compute_Hastings_correction(b_out, count_out, b_in, count_in, s, M, M_r_row,
     return p_backward / p_forward
 
 
-def compute_delta_entropy(r, s, partition: Partition, M_r_row, M_s_row, M_r_col, M_s_col, d_out_new, d_in_new, use_sparse):
+def compute_delta_entropy(r, s, partition: Partition, edge_count_updates: EdgeCountUpdates, d_out_new, d_in_new, use_sparse):
     """Compute change in entropy under the proposal. Reduced entropy means the proposed block is better than the current block.
 
         Parameters
@@ -491,14 +524,8 @@ def compute_delta_entropy(r, s, partition: Partition, M_r_row, M_s_row, M_r_col,
                     proposed block assignment for the node under consideration
         partition : Partition
                     the current partitioning results
-        M_r_row : ndarray or sparse matrix (int)
-                    the current block row of the new edge count matrix under proposal
-        M_s_row : ndarray or sparse matrix (int)
-                    the proposed block row of the new edge count matrix under proposal
-        M_r_col : ndarray or sparse matrix (int)
-                    the current block col of the new edge count matrix under proposal
-        M_s_col : ndarray or sparse matrix (int)
-                    the proposed block col of the new edge count matrix under proposal
+        edge_count_updates : EdgeCountUpdates
+                    the updates to the current partition's edge count
         d_out_new : ndarray (int)
                     the new out degree of each block under proposal
         d_in_new : ndarray (int)
@@ -527,15 +554,19 @@ def compute_delta_entropy(r, s, partition: Partition, M_r_row, M_s_row, M_r_col,
         where the sum runs over all entries $(t_1, t_2)$ in rows and cols $r$ and $s$ of the edge count matrix
     """
     if use_sparse: # computation in the sparse matrix is slow so convert to numpy arrays since operations are on only two rows and cols
-        M_r_row = M_r_row.toarray()
-        M_s_row = M_s_row.toarray()
-        M_r_col = M_r_col.toarray()
-        M_s_col = M_s_col.toarray()
+        M_r_row = edge_count_updates.block_row.toarray()
+        M_s_row = edge_count_updates.proposal_row.toarray()
+        M_r_col = edge_count_updates.block_col.toarray()
+        M_s_col = edge_count_updates.proposal_col.toarray()
         M_r_t1 = partition.interblock_edge_count[r, :].toarray()
         M_s_t1 = partition.interblock_edge_count[s, :].toarray()
         M_t2_r = partition.interblock_edge_count[:, r].toarray()
         M_t2_s = partition.interblock_edge_count[:, s].toarray()
     else:
+        M_r_row = edge_count_updates.block_row
+        M_s_row = edge_count_updates.proposal_row
+        M_r_col = edge_count_updates.block_col
+        M_s_col = edge_count_updates.proposal_col
         M_r_t1 = partition.interblock_edge_count[r, :]
         M_s_t1 = partition.interblock_edge_count[s, :]
         M_t2_r = partition.interblock_edge_count[:, r]
@@ -626,7 +657,7 @@ def carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_bloc
     return b, B
 
 
-def update_partition(b, ni, r, s, M, M_r_row, M_s_row, M_r_col, M_s_col, d_out_new, d_in_new, d_new, use_sparse):
+def update_partition(b, ni, r, s, M, edge_count_updates: EdgeCountUpdates, d_out_new, d_in_new, d_new, use_sparse):
     """Move the current node to the proposed block and update the edge counts
 
         Parameters
@@ -669,17 +700,17 @@ def update_partition(b, ni, r, s, M, M_r_row, M_s_row, M_r_col, M_s_col, d_out_n
         d_in_new : ndarray (int)
                     the in degree of each block after the move
         d_new : ndarray (int)
-                    the total degree of each block after the move"""
-
+                    the total degree of each block after the move
+    """
     b[ni] = s
-    M[r, :] = M_r_row
-    M[s, :] = M_s_row
+    M[r, :] = edge_count_updates.block_row
+    M[s, :] = edge_count_updates.proposal_row
     if use_sparse:
-        M[:, r] = M_r_col
-        M[:, s] = M_s_col
+        M[:, r] = edge_count_updates.block_col
+        M[:, s] = edge_count_updates.proposal_col
     else:
-        M[:, r] = M_r_col.reshape(M[:, r].shape)
-        M[:, s] = M_s_col.reshape(M[:, s].shape)
+        M[:, r] = edge_count_updates.block_col.reshape(M[:, r].shape)
+        M[:, s] = edge_count_updates.proposal_col.reshape(M[:, s].shape)
     return b, M, d_out_new, d_in_new, d_new
 
 

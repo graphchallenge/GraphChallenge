@@ -111,8 +111,7 @@ if __name__ == "__main__":
                     # compute the two new rows and columns of the interblock edge count matrix
                     self_edge_weight = np.sum(out_neighbors[current_node][np.where(
                         out_neighbors[current_node][:, 0] == current_node), 1])  # check if this node has a self edge
-                    new_interblock_edge_count_current_block_row, new_interblock_edge_count_new_block_row, new_interblock_edge_count_current_block_col, new_interblock_edge_count_new_block_col = \
-                        compute_new_rows_cols_interblock_edge_count_matrix(partition.interblock_edge_count, current_block, proposal,
+                    edge_count_updates = compute_new_rows_cols_interblock_edge_count_matrix(partition.interblock_edge_count, current_block, proposal,
                                                                         blocks_out, count_out, blocks_in, count_in,
                                                                         self_edge_weight, 0, use_sparse_matrix)
 
@@ -123,21 +122,17 @@ if __name__ == "__main__":
                     # compute the Hastings correction
                     if num_neighbor_edges>0:
                         Hastings_correction = compute_Hastings_correction(blocks_out, count_out, blocks_in, count_in, proposal,
-                                                                        partition.interblock_edge_count,
-                                                                        new_interblock_edge_count_current_block_row,
-                                                                        new_interblock_edge_count_current_block_col,
+                                                                        partition.interblock_edge_count, 
+                                                                        edge_count_updates.block_row,
+                                                                        edge_count_updates.block_col,
                                                                         partition.num_blocks, partition.block_degrees,
                                                                         block_degrees_new, use_sparse_matrix)
                     else: # if the node is an island, proposal is random and symmetric
                         Hastings_correction = 1
 
                     # compute change in entropy / posterior
-                    delta_entropy = compute_delta_entropy(current_block, proposal, partition,
-                                                        new_interblock_edge_count_current_block_row,
-                                                        new_interblock_edge_count_new_block_row,
-                                                        new_interblock_edge_count_current_block_col,
-                                                        new_interblock_edge_count_new_block_col, block_degrees_out_new, block_degrees_in_new,
-                                                        use_sparse_matrix)
+                    delta_entropy = compute_delta_entropy(current_block, proposal, partition, edge_count_updates, 
+                                                        block_degrees_out_new, block_degrees_in_new, use_sparse_matrix)
 
                     # compute probability of acceptance
                     p_accept = np.min([np.exp(-beta * delta_entropy) * Hastings_correction, 1])
@@ -149,9 +144,7 @@ if __name__ == "__main__":
                         itr_delta_entropy[itr] += delta_entropy
                         partition.block_assignment, partition.interblock_edge_count, partition.block_degrees_out, partition.block_degrees_in, partition.block_degrees = update_partition(
                             partition.block_assignment, current_node, current_block, proposal, partition.interblock_edge_count,
-                            new_interblock_edge_count_current_block_row, new_interblock_edge_count_new_block_row,
-                            new_interblock_edge_count_current_block_col, new_interblock_edge_count_new_block_col,
-                            block_degrees_out_new, block_degrees_in_new, block_degrees_new, use_sparse_matrix)
+                            edge_count_updates,  block_degrees_out_new, block_degrees_in_new, block_degrees_new, use_sparse_matrix)
             if verbose:
                 print("Itr: {}, number of nodal moves: {}, delta S: {:0.5f}".format(itr, num_nodal_moves,
                                                                                     itr_delta_entropy[itr] / float(

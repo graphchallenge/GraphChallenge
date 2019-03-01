@@ -48,8 +48,7 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
                 current_block, out_blocks, in_blocks, block_partition, partition, True, use_sparse_matrix)
 
             # compute the two new rows and columns of the interblock edge count matrix
-            new_interblock_edge_count_current_block_row, new_interblock_edge_count_new_block_row, new_interblock_edge_count_current_block_col, new_interblock_edge_count_new_block_col = \
-                compute_new_rows_cols_interblock_edge_count_matrix(partition.interblock_edge_count, current_block, proposal,
+            edge_count_updates = compute_new_rows_cols_interblock_edge_count_matrix(partition.interblock_edge_count, current_block, proposal,
                                                                 out_blocks[:, 0], out_blocks[:, 1], in_blocks[:, 0],
                                                                 in_blocks[:, 1],
                                                                 partition.interblock_edge_count[current_block, current_block],
@@ -64,12 +63,9 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
                                                                                                     num_neighbor_edges)
 
             # compute change in entropy / posterior
-            delta_entropy = compute_delta_entropy(current_block, proposal, partition,
-                                                new_interblock_edge_count_current_block_row,
-                                                new_interblock_edge_count_new_block_row,
-                                                new_interblock_edge_count_current_block_col,
-                                                new_interblock_edge_count_new_block_col, block_degrees_out_new, block_degrees_in_new,
-                                                use_sparse_matrix)
+            delta_entropy = compute_delta_entropy(current_block, proposal, partition, edge_count_updates, 
+                                                block_degrees_out_new, block_degrees_in_new, use_sparse_matrix)
+
             if delta_entropy < delta_entropy_for_each_block[current_block]:  # a better block candidate was found
                 best_merge_for_each_block[current_block] = proposal
                 delta_entropy_for_each_block[current_block] = delta_entropy
