@@ -8,7 +8,6 @@ from partition_baseline_support import compute_new_rows_cols_interblock_edge_cou
 from partition_baseline_support import compute_new_block_degrees
 from partition_baseline_support import compute_delta_entropy
 from partition_baseline_support import carry_out_best_merges
-from partition_baseline_support import initialize_edge_counts
 
 from partition import Partition
 
@@ -38,7 +37,7 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
     best_merge_for_each_block = np.ones(partition.num_blocks, dtype=int) * -1  # initialize to no merge
     delta_entropy_for_each_block = np.ones(partition.num_blocks) * np.Inf  # initialize criterion
     block_partition = range(partition.num_blocks)
-    for current_block in range(partition.num_blocks):  # evalaute agglomerative updates for each block
+    for current_block in range(partition.num_blocks):  # evaluate agglomerative updates for each block
         for _ in range(num_agg_proposals_per_block):
             # populate edges to neighboring blocks
             out_blocks = outgoing_edges(partition.interblock_edge_count, current_block, use_sparse_matrix)
@@ -59,20 +58,17 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
             # compute new block degrees
             block_degrees_out_new, block_degrees_in_new, block_degrees_new = compute_new_block_degrees(current_block,
                                                                                                     proposal,
-                                                                                                    partition.block_degrees_out,
-                                                                                                    partition.block_degrees_in,
-                                                                                                    partition.block_degrees,
+                                                                                                    partition,
                                                                                                     num_out_neighbor_edges,
                                                                                                     num_in_neighbor_edges,
                                                                                                     num_neighbor_edges)
 
             # compute change in entropy / posterior
-            delta_entropy = compute_delta_entropy(current_block, proposal, partition.interblock_edge_count,
+            delta_entropy = compute_delta_entropy(current_block, proposal, partition,
                                                 new_interblock_edge_count_current_block_row,
                                                 new_interblock_edge_count_new_block_row,
                                                 new_interblock_edge_count_current_block_col,
-                                                new_interblock_edge_count_new_block_col, partition.block_degrees_out,
-                                                partition.block_degrees_in, block_degrees_out_new, block_degrees_in_new,
+                                                new_interblock_edge_count_new_block_col, block_degrees_out_new, block_degrees_in_new,
                                                 use_sparse_matrix)
             if delta_entropy < delta_entropy_for_each_block[current_block]:  # a better block candidate was found
                 best_merge_for_each_block[current_block] = proposal

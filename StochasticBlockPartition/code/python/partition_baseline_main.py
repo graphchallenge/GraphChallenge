@@ -118,8 +118,7 @@ if __name__ == "__main__":
 
                     # compute new block degrees
                     block_degrees_out_new, block_degrees_in_new, block_degrees_new = compute_new_block_degrees(
-                        current_block, proposal, partition.block_degrees_out, partition.block_degrees_in, partition.block_degrees, num_out_neighbor_edges,
-                        num_in_neighbor_edges, num_neighbor_edges)
+                        current_block, proposal, partition, num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges)
 
                     # compute the Hastings correction
                     if num_neighbor_edges>0:
@@ -133,12 +132,11 @@ if __name__ == "__main__":
                         Hastings_correction = 1
 
                     # compute change in entropy / posterior
-                    delta_entropy = compute_delta_entropy(current_block, proposal, partition.interblock_edge_count,
+                    delta_entropy = compute_delta_entropy(current_block, proposal, partition,
                                                         new_interblock_edge_count_current_block_row,
                                                         new_interblock_edge_count_new_block_row,
                                                         new_interblock_edge_count_current_block_col,
-                                                        new_interblock_edge_count_new_block_col, partition.block_degrees_out,
-                                                        partition.block_degrees_in, block_degrees_out_new, block_degrees_in_new,
+                                                        new_interblock_edge_count_new_block_col, block_degrees_out_new, block_degrees_in_new,
                                                         use_sparse_matrix)
 
                     # compute probability of acceptance
