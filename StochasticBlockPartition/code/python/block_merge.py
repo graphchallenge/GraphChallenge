@@ -83,11 +83,7 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
                                                 partition.num_blocks, num_blocks_to_merge)
 
     # re-initialize edge counts and block degrees
-    # TODO(): Change this to a call to partition.initialize_edge_counts()
-    partition.interblock_edge_count, partition.block_degrees_out, partition.block_degrees_in, partition.block_degrees = initialize_edge_counts(out_neighbors,
-                                                                                                    partition.num_blocks,
-                                                                                                    partition.block_assignment,
-                                                                                                    use_sparse_matrix)
+    partition.initialize_edge_counts(out_neighbors, use_sparse_matrix)
     
     return partition
 # End of merge_blocks()
