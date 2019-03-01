@@ -41,22 +41,8 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
     for current_block in range(partition.num_blocks):  # evalaute agglomerative updates for each block
         for _ in range(num_agg_proposals_per_block):
             # populate edges to neighboring blocks
-            if use_sparse_matrix:
-                out_blocks = partition.interblock_edge_count[current_block, :].nonzero()[1]
-                out_blocks = np.hstack((out_blocks.reshape([len(out_blocks), 1]),
-                                        partition.interblock_edge_count[current_block, out_blocks].toarray().transpose()))
-            else:
-                out_blocks = partition.interblock_edge_count[current_block, :].nonzero()
-                out_blocks = np.hstack(
-                    (np.array(out_blocks).transpose(), partition.interblock_edge_count[current_block, out_blocks].transpose()))
-            if use_sparse_matrix:
-                in_blocks = partition.interblock_edge_count[:, current_block].nonzero()[0]
-                in_blocks = np.hstack(
-                    (in_blocks.reshape([len(in_blocks), 1]), partition.interblock_edge_count[in_blocks, current_block].toarray()))
-            else:
-                in_blocks = partition.interblock_edge_count[:, current_block].nonzero()
-                in_blocks = np.hstack(
-                    (np.array(in_blocks).transpose(), partition.interblock_edge_count[in_blocks, current_block].transpose()))
+            out_blocks = outgoing_edges(partition.interblock_edge_count, current_block, use_sparse_matrix)
+            in_blocks = incoming_edges(partition.interblock_edge_count, current_block, use_sparse_matrix)
 
             # propose a new block to merge with
             proposal, num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges = propose_new_partition(
@@ -105,3 +91,58 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
     
     return partition
 # End of merge_blocks()
+
+
+def outgoing_edges(adjacency_matrix: np.array, block: int, use_sparse_matrix: bool) -> np.array:
+    """Finds the outgoing edges from a given block, with their weights.
+
+        Parameters
+        ----------
+        adjacency_matrix : np.array [int]
+                the adjacency matrix for all blocks in the current partition
+        block : int
+                the block for which to get the outgoing edges
+        use_sparse_matrix : bool
+                if True, then the adjacency_matrix is stored in a sparse format
+
+        Returns
+        -------
+        outgoing_edges : np.array [int]
+                matrix with two columns, representing the edge (as the other block's ID), and the weight of the edge
+    """
+    if use_sparse_matrix:
+        out_blocks = adjacency_matrix[block, :].nonzero()[1]
+        out_blocks = np.hstack((out_blocks.reshape([len(out_blocks), 1]),
+                                adjacency_matrix[block, out_blocks].toarray().transpose()))
+    else:
+        out_blocks = adjacency_matrix[block, :].nonzero()
+        out_blocks = np.hstack((np.array(out_blocks).transpose(), adjacency_matrix[block, out_blocks].transpose()))
+    return out_blocks
+# End of outgoing_edges()
+
+def incoming_edges(adjacency_matrix: np.array, block: int, use_sparse_matrix: bool) -> np.array:
+    """Finds the incoming edges to a given block, with their weights.
+
+        Parameters
+        ----------
+        adjacency_matrix : np.array [int]
+                the adjacency matrix for all blocks in the current partition
+        block : int
+                the block for which to get the incoming edges
+        use_sparse_matrix : bool
+                if True, then the adjacency_matrix is stored in a sparse format
+
+        Returns
+        -------
+        incoming_edges : np.array [int]
+                matrix with two columns, representing the edge (as the other block's ID), and the weight of the edge
+    """
+    if use_sparse_matrix:
+        in_blocks = adjacency_matrix[:, block].nonzero()[0]
+        in_blocks = np.hstack(
+            (in_blocks.reshape([len(in_blocks), 1]), adjacency_matrix[in_blocks, block].toarray()))
+    else:
+        in_blocks = adjacency_matrix[:, block].nonzero()
+        in_blocks = np.hstack((np.array(in_blocks).transpose(), adjacency_matrix[in_blocks, block].transpose()))
+    return in_blocks
+# End of incoming_edges()
