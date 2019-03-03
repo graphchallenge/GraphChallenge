@@ -1,6 +1,8 @@
 """Contains code for the block merge part of the baseline algorithm.
 """
 
+from typing import Tuple
+
 import numpy as np
 
 from partition_baseline_support import propose_new_partition
@@ -39,33 +41,7 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
     block_partition = range(partition.num_blocks)
     for current_block in range(partition.num_blocks):  # evaluate agglomerative updates for each block
         for _ in range(num_agg_proposals_per_block):
-            # populate edges to neighboring blocks
-            out_blocks = outgoing_edges(partition.interblock_edge_count, current_block, use_sparse_matrix)
-            in_blocks = incoming_edges(partition.interblock_edge_count, current_block, use_sparse_matrix)
-
-            # propose a new block to merge with
-            proposal, num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges = propose_new_partition(
-                current_block, out_blocks, in_blocks, block_partition, partition, True, use_sparse_matrix)
-
-            # compute the two new rows and columns of the interblock edge count matrix
-            edge_count_updates = compute_new_rows_cols_interblock_edge_count_matrix(partition.interblock_edge_count, current_block, proposal,
-                                                                out_blocks[:, 0], out_blocks[:, 1], in_blocks[:, 0],
-                                                                in_blocks[:, 1],
-                                                                partition.interblock_edge_count[current_block, current_block],
-                                                                1, use_sparse_matrix)
-
-            # compute new block degrees
-            block_degrees_out_new, block_degrees_in_new, block_degrees_new = compute_new_block_degrees(current_block,
-                                                                                                    proposal,
-                                                                                                    partition,
-                                                                                                    num_out_neighbor_edges,
-                                                                                                    num_in_neighbor_edges,
-                                                                                                    num_neighbor_edges)
-
-            # compute change in entropy / posterior
-            delta_entropy = compute_delta_entropy(current_block, proposal, partition, edge_count_updates, 
-                                                block_degrees_out_new, block_degrees_in_new, use_sparse_matrix)
-
+            proposal, delta_entropy = propose_merge(current_block, partition, use_sparse_matrix, block_partition)
             if delta_entropy < delta_entropy_for_each_block[current_block]:  # a better block candidate was found
                 best_merge_for_each_block[current_block] = proposal
                 delta_entropy_for_each_block[current_block] = delta_entropy
@@ -79,6 +55,57 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
     
     return partition
 # End of merge_blocks()
+
+
+def propose_merge(current_block: int, partition: Partition, use_sparse_matrix: bool, block_partition: np.array) -> Tuple[int, float]:
+    """Propose a block merge, and calculate its delta entropy value.
+
+        Parameters
+        ----------
+        current_block : int
+                the block for which to propose merges
+        partition : Partition
+                the current partitioning results
+        use_sparse_matrix : bool
+                if True, the interblock edge count matrix is stored using a slower sparse representation
+        block_partition : np.array [int]
+                the current block assignment for every block
+
+        Returns
+        -------
+        proposal : int
+                the proposed block to merge with
+        delta_entropy : float
+                the delta entropy of the proposed merge
+    """
+    # populate edges to neighboring blocks
+    out_blocks = outgoing_edges(partition.interblock_edge_count, current_block, use_sparse_matrix)
+    in_blocks = incoming_edges(partition.interblock_edge_count, current_block, use_sparse_matrix)
+
+    # propose a new block to merge with
+    proposal, num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges = propose_new_partition(
+        current_block, out_blocks, in_blocks, block_partition, partition, True, use_sparse_matrix)
+
+    # compute the two new rows and columns of the interblock edge count matrix
+    edge_count_updates = compute_new_rows_cols_interblock_edge_count_matrix(partition.interblock_edge_count, current_block, proposal,
+                                                        out_blocks[:, 0], out_blocks[:, 1], in_blocks[:, 0],
+                                                        in_blocks[:, 1],
+                                                        partition.interblock_edge_count[current_block, current_block],
+                                                        1, use_sparse_matrix)
+
+    # compute new block degrees
+    block_degrees_out_new, block_degrees_in_new, block_degrees_new = compute_new_block_degrees(current_block,
+                                                                                            proposal,
+                                                                                            partition,
+                                                                                            num_out_neighbor_edges,
+                                                                                            num_in_neighbor_edges,
+                                                                                            num_neighbor_edges)
+
+    # compute change in entropy / posterior
+    delta_entropy = compute_delta_entropy(current_block, proposal, partition, edge_count_updates, 
+                                        block_degrees_out_new, block_degrees_in_new, use_sparse_matrix)
+    return proposal, delta_entropy
+# End of propose_merge()
 
 
 def outgoing_edges(adjacency_matrix: np.array, block: int, use_sparse_matrix: bool) -> np.array:
