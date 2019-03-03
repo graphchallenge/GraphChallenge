@@ -614,7 +614,8 @@ def compute_delta_entropy(r, s, partition: Partition, edge_count_updates: EdgeCo
     return delta_entropy
 
 
-def carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_block, b, B, B_to_merge):
+def carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_block, partition: Partition,
+    B_to_merge) -> Partition:
     """Execute the best merge (agglomerative) moves to reduce a set number of blocks
 
         Parameters
@@ -623,22 +624,18 @@ def carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_bloc
                     the delta entropy for merging each block
         best_merge_for_each_block : ndarray (int)
                     the best block to merge with for each block
-        b : ndarray (int)
-                    array of block assignment for each node
-        B : int
-                    total number of blocks in the current partition
+        partition : Partition
+                    the current partitioning results
         B_to_merge : int
                     the number of blocks to merge
 
         Returns
         -------
-        b : ndarray (int)
-                    array of new block assignment for each node after the merge
-        B : int
-                    total number of blocks after the merge"""
-
+        partition : Partition
+                    the modified partition, with the merges carried out
+    """
     bestMerges = delta_entropy_for_each_block.argsort()
-    block_map = np.arange(B)
+    block_map = np.arange(partition.num_blocks)
     num_merge = 0
     counter = 0
     while num_merge < B_to_merge:
@@ -647,14 +644,15 @@ def carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_bloc
         counter += 1
         if mergeTo != mergeFrom:
             block_map[np.where(block_map == mergeFrom)] = mergeTo
-            b[np.where(b == mergeFrom)] = mergeTo
+            partition.block_assignment[np.where(partition.block_assignment == mergeFrom)] = mergeTo
             num_merge += 1
-    remaining_blocks = np.unique(b)
-    mapping = -np.ones(B, dtype=int)
+    remaining_blocks = np.unique(partition.block_assignment)
+    mapping = -np.ones(partition.num_blocks, dtype=int)
     mapping[remaining_blocks] = np.arange(len(remaining_blocks))
-    b = mapping[b]
-    B -= B_to_merge
-    return b, B
+    partition.block_assignment = mapping[partition.block_assignment]
+    partition.num_blocks -= B_to_merge
+    return partition
+# End of carry_out_best_merges()
 
 
 def update_partition(b, ni, r, s, M, edge_count_updates: EdgeCountUpdates, d_out_new, d_in_new, d_new, use_sparse):

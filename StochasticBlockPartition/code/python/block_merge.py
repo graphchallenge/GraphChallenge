@@ -47,8 +47,7 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
                 delta_entropy_for_each_block[current_block] = delta_entropy
 
     # carry out the best merges
-    partition.block_assignment, partition.num_blocks = carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_block, partition.block_assignment,
-                                                partition.num_blocks, num_blocks_to_merge)
+    partition = carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_block, partition, num_blocks_to_merge)
 
     # re-initialize edge counts and block degrees
     partition.initialize_edge_counts(out_neighbors, use_sparse_matrix)
