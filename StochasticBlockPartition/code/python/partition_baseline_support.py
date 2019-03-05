@@ -655,21 +655,20 @@ def carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_bloc
 # End of carry_out_best_merges()
 
 
-def update_partition(b, ni, r, s, M, edge_count_updates: EdgeCountUpdates, d_out_new, d_in_new, d_new, use_sparse):
+def update_partition(partition: Partition, ni, r, s, edge_count_updates: EdgeCountUpdates, d_out_new, d_in_new, d_new,
+    use_sparse: bool) -> Partition:
     """Move the current node to the proposed block and update the edge counts
 
         Parameters
         ----------
-        b : ndarray (int)
-                    current array of new block assignment for each node
+        partition : Partition
+                    the current partitioning results
         ni : int
                     current node index
         r : int
                     current block assignment for the node under consideration
         s : int
                     proposed block assignment for the node under consideration
-        M : ndarray or sparse matrix (int), shape = (#blocks, #blocks)
-                    edge count matrix between all the blocks.
         M_r_row : ndarray or sparse matrix (int)
                     the current block row of the new edge count matrix under proposal
         M_s_row : ndarray or sparse matrix (int)
@@ -689,27 +688,23 @@ def update_partition(b, ni, r, s, M, edge_count_updates: EdgeCountUpdates, d_out
 
         Returns
         -------
-        b : ndarray (int)
-                    array of block assignment for each node after the move
-        M : ndarray or sparse matrix (int), shape = (#blocks, #blocks)
-                    edge count matrix between all the blocks after the move
-        d_out_new : ndarray (int)
-                    the out degree of each block after the move
-        d_in_new : ndarray (int)
-                    the in degree of each block after the move
-        d_new : ndarray (int)
-                    the total degree of each block after the move
+        partition : Partition
+                    the updated partitioning results
     """
-    b[ni] = s
-    M[r, :] = edge_count_updates.block_row
-    M[s, :] = edge_count_updates.proposal_row
+    partition.block_assignment[ni] = s
+    partition.interblock_edge_count[r, :] = edge_count_updates.block_row
+    partition.interblock_edge_count[s, :] = edge_count_updates.proposal_row
     if use_sparse:
-        M[:, r] = edge_count_updates.block_col
-        M[:, s] = edge_count_updates.proposal_col
+        partition.interblock_edge_count[:, r] = edge_count_updates.block_col
+        partition.interblock_edge_count[:, s] = edge_count_updates.proposal_col
     else:
-        M[:, r] = edge_count_updates.block_col.reshape(M[:, r].shape)
-        M[:, s] = edge_count_updates.proposal_col.reshape(M[:, s].shape)
-    return b, M, d_out_new, d_in_new, d_new
+        partition.interblock_edge_count[:, r] = edge_count_updates.block_col.reshape(partition.interblock_edge_count[:, r].shape)
+        partition.interblock_edge_count[:, s] = edge_count_updates.proposal_col.reshape(partition.interblock_edge_count[:, s].shape)
+    partition.block_degrees_out = d_out_new
+    partition.block_degrees_in = d_in_new
+    partition.block_degrees = d_new
+    return partition
+# End of update_partition()
 
 
 def compute_overall_entropy(partition: Partition, N, E, use_sparse) -> float:

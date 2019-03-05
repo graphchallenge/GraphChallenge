@@ -87,9 +87,9 @@ def reassign_nodes(partition: Partition, num_nodes: int, num_edges: int, out_nei
                     total_num_nodal_moves += 1
                     num_nodal_moves += 1
                     itr_delta_entropy[itr] += delta_entropy
-                    partition.block_assignment, partition.interblock_edge_count, partition.block_degrees_out, partition.block_degrees_in, partition.block_degrees = update_partition(
-                        partition.block_assignment, current_node, current_block, proposal, partition.interblock_edge_count,
-                        edge_count_updates,  block_degrees_out_new, block_degrees_in_new, block_degrees_new, use_sparse_matrix)
+                    partition = update_partition(partition, current_node, current_block, proposal, edge_count_updates,
+                                                 block_degrees_out_new, block_degrees_in_new, block_degrees_new, 
+                                                 use_sparse_matrix)
 
         if verbose:
             print("Itr: {}, number of nodal moves: {}, delta S: {:0.5f}".format(itr, num_nodal_moves,
