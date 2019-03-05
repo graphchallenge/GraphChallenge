@@ -9,6 +9,7 @@ import os, sys, argparse
 
 from partition import Partition
 from block_merge import merge_blocks
+from node_reassignment import reassign_nodes
 
 
 if __name__ == "__main__":
@@ -43,7 +44,6 @@ if __name__ == "__main__":
         t0 = timeit.default_timer()
 
     # partition update parameters
-    beta = 3  # exploitation versus exploration (higher value favors exploitation)
     use_sparse_matrix = False  # whether to represent the edge count matrix using sparse matrix
                             # Scipy's sparse matrix is slow but this may be necessary for large graphs
 
@@ -52,13 +52,6 @@ if __name__ == "__main__":
     # agglomerative partition update parameters
     num_agg_proposals_per_block = 10  # number of proposals per block
     num_block_reduction_rate = 0.5  # fraction of blocks to reduce until the golden ratio bracket is established
-
-    # nodal partition updates parameters
-    max_num_nodal_itr = 100  # maximum number of iterations
-    delta_entropy_threshold1 = 5e-4  # stop iterating when the change in entropy falls below this fraction of the overall entropy
-                                    # lowering this threshold results in more nodal update iterations and likely better performance, but longer runtime
-    delta_entropy_threshold2 = 1e-4  # threshold after the golden ratio bracket is established (typically lower to fine-tune to partition)
-    delta_entropy_moving_avg_window = 3  # width of the moving average window for the delta entropy convergence criterion
 
     # initialize items before iterations to find the partition with the optimal number of blocks
     partition_triplet, graph_object = initialize_partition_variables()
@@ -79,94 +72,12 @@ if __name__ == "__main__":
         ############################
         # NODAL BLOCK UPDATES
         ############################
+
         if verbose:
             print("Beginning nodal updates")
-        total_num_nodal_moves = 0
-        itr_delta_entropy = np.zeros(max_num_nodal_itr)
 
-        # compute the global entropy for MCMC convergence criterion
-        partition.overall_entropy = compute_overall_entropy(partition.interblock_edge_count, partition.block_degrees_out, partition.block_degrees_in, partition.num_blocks, N,
-                                                E, use_sparse_matrix)
+        partition = reassign_nodes(partition, N, E, out_neighbors, in_neighbors, partition_triplet, use_sparse_matrix, verbose)
 
-        for itr in range(max_num_nodal_itr):
-            num_nodal_moves = 0
-            itr_delta_entropy[itr] = 0
-
-            for current_node in range(N):
-                current_block = partition.block_assignment[current_node]
-                # propose a new block for this node
-                proposal, num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges = propose_new_partition(
-                    current_block, out_neighbors[current_node], in_neighbors[current_node], partition.block_assignment,
-                    partition, False, use_sparse_matrix)
-
-                # determine whether to accept or reject the proposal
-                if (proposal != current_block):
-                    # compute block counts of in and out neighbors
-                    blocks_out, inverse_idx_out = np.unique(partition.block_assignment[out_neighbors[current_node][:, 0]],
-                                                            return_inverse=True)
-                    count_out = np.bincount(inverse_idx_out, weights=out_neighbors[current_node][:, 1]).astype(int)
-                    blocks_in, inverse_idx_in = np.unique(partition.block_assignment[in_neighbors[current_node][:, 0]], return_inverse=True)
-                    count_in = np.bincount(inverse_idx_in, weights=in_neighbors[current_node][:, 1]).astype(int)
-
-                    # compute the two new rows and columns of the interblock edge count matrix
-                    self_edge_weight = np.sum(out_neighbors[current_node][np.where(
-                        out_neighbors[current_node][:, 0] == current_node), 1])  # check if this node has a self edge
-                    edge_count_updates = compute_new_rows_cols_interblock_edge_count_matrix(partition.interblock_edge_count, current_block, proposal,
-                                                                        blocks_out, count_out, blocks_in, count_in,
-                                                                        self_edge_weight, 0, use_sparse_matrix)
-
-                    # compute new block degrees
-                    block_degrees_out_new, block_degrees_in_new, block_degrees_new = compute_new_block_degrees(
-                        current_block, proposal, partition, num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges)
-
-                    # compute the Hastings correction
-                    if num_neighbor_edges>0:
-                        Hastings_correction = compute_Hastings_correction(blocks_out, count_out, blocks_in, count_in, proposal,
-                                                                        partition.interblock_edge_count, 
-                                                                        edge_count_updates.block_row,
-                                                                        edge_count_updates.block_col,
-                                                                        partition.num_blocks, partition.block_degrees,
-                                                                        block_degrees_new, use_sparse_matrix)
-                    else: # if the node is an island, proposal is random and symmetric
-                        Hastings_correction = 1
-
-                    # compute change in entropy / posterior
-                    delta_entropy = compute_delta_entropy(current_block, proposal, partition, edge_count_updates, 
-                                                        block_degrees_out_new, block_degrees_in_new, use_sparse_matrix)
-
-                    # compute probability of acceptance
-                    p_accept = np.min([np.exp(-beta * delta_entropy) * Hastings_correction, 1])
-
-                    # if accept the proposal, update the block_assignment, inter_block_edge_count, and block degrees
-                    if (np.random.uniform() <= p_accept):
-                        total_num_nodal_moves += 1
-                        num_nodal_moves += 1
-                        itr_delta_entropy[itr] += delta_entropy
-                        partition.block_assignment, partition.interblock_edge_count, partition.block_degrees_out, partition.block_degrees_in, partition.block_degrees = update_partition(
-                            partition.block_assignment, current_node, current_block, proposal, partition.interblock_edge_count,
-                            edge_count_updates,  block_degrees_out_new, block_degrees_in_new, block_degrees_new, use_sparse_matrix)
-            if verbose:
-                print("Itr: {}, number of nodal moves: {}, delta S: {:0.5f}".format(itr, num_nodal_moves,
-                                                                                    itr_delta_entropy[itr] / float(
-                                                                                        partition.overall_entropy)))
-            if itr >= (
-                delta_entropy_moving_avg_window - 1):  # exit MCMC if the recent change in entropy falls below a small fraction of the overall entropy
-                if not (np.all(np.isfinite(partition_triplet.overall_entropy))):  # golden ratio bracket not yet established
-                    if (-np.mean(itr_delta_entropy[(itr - delta_entropy_moving_avg_window + 1):itr]) < (
-                        delta_entropy_threshold1 * partition.overall_entropy)):
-                        break
-                else:  # golden ratio bracket is established. Fine-tuning partition.
-                    if (-np.mean(itr_delta_entropy[(itr - delta_entropy_moving_avg_window + 1):itr]) < (
-                        delta_entropy_threshold2 * partition.overall_entropy)):
-                        break
-
-        # compute the global entropy for determining the optimal number of blocks
-        partition.overall_entropy = compute_overall_entropy(partition.interblock_edge_count, partition.block_degrees_out, partition.block_degrees_in, partition.num_blocks, N,
-                                                E, use_sparse_matrix)
-
-        if verbose:
-            print(
-            "Total number of nodal moves: {}, overall_entropy: {:0.2f}".format(total_num_nodal_moves, partition.overall_entropy))
         if visualize_graph:
             graph_object = plot_graph_with_partition(out_neighbors, partition.block_assignment, graph_object)
 
