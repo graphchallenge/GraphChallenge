@@ -712,20 +712,14 @@ def update_partition(b, ni, r, s, M, edge_count_updates: EdgeCountUpdates, d_out
     return b, M, d_out_new, d_in_new, d_new
 
 
-def compute_overall_entropy(M, d_out, d_in, B, N, E, use_sparse):
+def compute_overall_entropy(partition: Partition, N, E, use_sparse) -> float:
     """Compute the overall entropy, including the model entropy as well as the data entropy, on the current partition.
        The best partition with an optimal number of blocks will minimize this entropy.
 
         Parameters
         ----------
-        M : ndarray or sparse matrix (int), shape = (#blocks, #blocks)
-                    edge count matrix between all the blocks.
-        d_out : ndarray (int)
-                    the current out degrees of each block
-        d_in : ndarray (int)
-                    the current in degrees of each block
-        B : int
-                    the number of blocks in the partition
+        partition : Partition
+                    the current partitioning results
         N : int
                     number of nodes in the graph
         E : int
@@ -750,17 +744,17 @@ def compute_overall_entropy(M, d_out, d_in, B, N, E, use_sparse):
         
         S = E\;h\left(\frac{B^2}{E}\right) + N \ln(B) - \sum_{t_1, t_2} {M_{t_1 t_2} \ln\left(\frac{M_{t_1 t_2}}{d_{t_1, out} d_{t_2, in}}\right)} + C
         
-        where the function h(x)=(1+x)\ln(1+x) - x\ln(x) and the sum runs over all entries (t_1, t_2) in the edge count matrix"""
-
-    nonzeros = M.nonzero()  # all non-zero entries
-    edge_count_entries = M[nonzeros[0], nonzeros[1]]
+        where the function h(x)=(1+x)\ln(1+x) - x\ln(x) and the sum runs over all entries (t_1, t_2) in the edge count matrix
+    """
+    nonzeros = partition.interblock_edge_count.nonzero()  # all non-zero entries
+    edge_count_entries = partition.interblock_edge_count[nonzeros[0], nonzeros[1]]
     if use_sparse:
         edge_count_entries = edge_count_entries.toarray()
 
-    entries = edge_count_entries * np.log(edge_count_entries / (d_out[nonzeros[0]] * d_in[nonzeros[1]]).astype(float))
+    entries = edge_count_entries * np.log(edge_count_entries / (partition.block_degrees_out[nonzeros[0]] * partition.block_degrees_in[nonzeros[1]]).astype(float))
     data_S = -np.sum(entries)
-    model_S_term = B**2 / float(E)
-    model_S = E * (1 + model_S_term) * np.log(1 + model_S_term) - model_S_term * np.log(model_S_term) + N*np.log(B)
+    model_S_term = partition.num_blocks**2 / float(E)
+    model_S = E * (1 + model_S_term) * np.log(1 + model_S_term) - model_S_term * np.log(model_S_term) + N*np.log(partition.num_blocks)
     S = model_S + data_S
     return S
 
