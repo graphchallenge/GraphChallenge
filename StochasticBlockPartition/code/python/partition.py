@@ -3,6 +3,7 @@
 
 from collections import namedtuple
 from typing import List
+from argparse import Namespace
 
 import numpy as np
 from scipy import sparse as sparse
@@ -10,7 +11,21 @@ from scipy import sparse as sparse
 from graph import Graph
 
 class Partition():
-    def __init__(self, num_blocks: int, out_neighbors: List[np.ndarray], use_sparse: bool) -> None:
+    """Stores the current partitioning results.
+    """
+
+    def __init__(self, num_blocks: int, out_neighbors: List[np.ndarray], args: Namespace) -> None:
+        """Creates a new Partition object.
+
+            Parameters
+            ---------
+            num_blocks : int
+                    the number of blocks in the current partition
+            out_neighbors : List[np.ndarray]
+                    list of outgoing edges for each node
+            args : Namespace
+                    the command-line arguments
+        """
         self.num_blocks = num_blocks
         self.block_assignment = np.array(range(num_blocks))
         self.overall_entropy = np.inf
@@ -18,37 +33,39 @@ class Partition():
         self.block_degrees = np.zeros(num_blocks)
         self.block_degrees_out = np.zeros(num_blocks)
         self.block_degrees_in = np.zeros(num_blocks)
-        self.initialize_edge_counts(out_neighbors, use_sparse)
+        self.num_blocks_to_merge = int(self.num_blocks * args.blockReductionRate)
+        self.initialize_edge_counts(out_neighbors, args.sparse)
+    # End of __init__()
 
     def initialize_edge_counts(self, out_neighbors: List[np.ndarray], use_sparse: bool):
         """Initialize the edge count matrix and block degrees according to the current partition
 
-        Parameters
-        ----------
-        out_neighbors : list of ndarray; list length is N, the number of nodes
-                    each element of the list is a ndarray of out neighbors, where the first column is the node indices
-                    and the second column the corresponding edge weights
-        B : int
-                    total number of blocks in the current partition
-        b : ndarray (int)
-                    array of block assignment for each node
-        use_sparse : bool
-                    whether the edge count matrix is stored as a sparse matrix
+            Parameters
+            ----------
+            out_neighbors : list of ndarray; list length is N, the number of nodes
+                        each element of the list is a ndarray of out neighbors, where the first column is the node
+                        indices and the second column the corresponding edge weights
+            B : int
+                        total number of blocks in the current partition
+            b : ndarray (int)
+                        array of block assignment for each node
+            use_sparse : bool
+                        whether the edge count matrix is stored as a sparse matrix
 
-        Returns
-        -------
-        M : ndarray or sparse matrix (int), shape = (#blocks, #blocks)
-                    edge count matrix between all the blocks.
-        d_out : ndarray (int)
-                    the current out degree of each block
-        d_in : ndarray (int)
-                    the current in degree of each block
-        d : ndarray (int)
-                    the current total degree of each block
+            Returns
+            -------
+            M : ndarray or sparse matrix (int), shape = (#blocks, #blocks)
+                        edge count matrix between all the blocks.
+            d_out : ndarray (int)
+                        the current out degree of each block
+            d_in : ndarray (int)
+                        the current in degree of each block
+            d : ndarray (int)
+                        the current total degree of each block
 
-        Notes
-        -----
-        Compute the edge count matrix and the block degrees from scratch
+            Notes
+            -----
+            Compute the edge count matrix and the block degrees from scratch
         """
         if use_sparse: # store interblock edge counts as a sparse matrix
             self.interblock_edge_count = sparse.lil_matrix((self.num_blocks, self.num_blocks), dtype=int)

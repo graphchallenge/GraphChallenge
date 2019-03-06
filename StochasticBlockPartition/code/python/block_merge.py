@@ -15,7 +15,7 @@ from partition import Partition
 
 
 def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_sparse_matrix: bool,
-    num_blocks_to_merge: int, out_neighbors: np.array) -> Partition:
+    out_neighbors: np.array) -> Partition:
     """The block merge portion of the algorithm.
 
         Parameters:
@@ -26,8 +26,6 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
                 the number of proposals to make for each block
         use_sparse_matrix : bool
                 if True, then use the slower but smaller sparse matrix representation to store matrices
-        num_blocks_to_merge : int
-                the number of blocks to merge in this iteration
         out_neighbors : np.array
                 the matrix representing neighboring blocks
 
@@ -47,7 +45,7 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
                 delta_entropy_for_each_block[current_block] = delta_entropy
 
     # carry out the best merges
-    partition = carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_block, partition, num_blocks_to_merge)
+    partition = carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_block, partition)
 
     # re-initialize edge counts and block degrees
     partition.initialize_edge_counts(out_neighbors, use_sparse_matrix)

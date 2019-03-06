@@ -614,8 +614,7 @@ def compute_delta_entropy(r, s, partition: Partition, edge_count_updates: EdgeCo
     return delta_entropy
 
 
-def carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_block, partition: Partition,
-    B_to_merge) -> Partition:
+def carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_block, partition: Partition) -> Partition:
     """Execute the best merge (agglomerative) moves to reduce a set number of blocks
 
         Parameters
@@ -626,8 +625,6 @@ def carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_bloc
                     the best block to merge with for each block
         partition : Partition
                     the current partitioning results
-        B_to_merge : int
-                    the number of blocks to merge
 
         Returns
         -------
@@ -638,7 +635,7 @@ def carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_bloc
     block_map = np.arange(partition.num_blocks)
     num_merge = 0
     counter = 0
-    while num_merge < B_to_merge:
+    while num_merge < partition.num_blocks_to_merge:
         mergeFrom = bestMerges[counter]
         mergeTo = block_map[best_merge_for_each_block[bestMerges[counter]]]
         counter += 1
@@ -650,7 +647,7 @@ def carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_bloc
     mapping = -np.ones(partition.num_blocks, dtype=int)
     mapping[remaining_blocks] = np.arange(len(remaining_blocks))
     partition.block_assignment = mapping[partition.block_assignment]
-    partition.num_blocks -= B_to_merge
+    partition.num_blocks -= partition.num_blocks_to_merge
     return partition
 # End of carry_out_best_merges()
 
@@ -853,8 +850,8 @@ def prepare_for_partition_on_next_num_blocks(partition: Partition, partition_tri
 
     # find the next number of blocks to try using golden ratio bisection
     if partition_triplet.overall_entropy[2] == np.Inf:  # if the three points in the golden ratio bracket has not yet been established
-        B_to_merge = int(partition.num_blocks*B_rate)
-        if (B_to_merge==0): # not enough number of blocks to merge so done
+        partition.num_blocks_to_merge = int(partition.num_blocks*B_rate)
+        if (partition.num_blocks_to_merge == 0): # not enough number of blocks to merge so done
             optimal_B_found = True
         partition.block_assignment = partition_triplet.block_assignment[1].copy()
         partition.interblock_edge_count = partition_triplet.interblock_edge_count[1].copy()
@@ -872,7 +869,7 @@ def prepare_for_partition_on_next_num_blocks(partition: Partition, partition_tri
             else:  # the lower segment in the bracket is bigger
                 index = 1
             next_B_to_try = partition_triplet.num_blocks[index + 1] + np.round((partition_triplet.num_blocks[index] - partition_triplet.num_blocks[index + 1]) * 0.618).astype(int)
-            B_to_merge = partition_triplet.num_blocks[index] - next_B_to_try
+            partition.num_blocks_to_merge = partition_triplet.num_blocks[index] - next_B_to_try
             partition.num_blocks = partition_triplet.num_blocks[index]
             partition.block_assignment = partition_triplet.block_assignment[index].copy()
             partition.interblock_edge_count = partition_triplet.interblock_edge_count[index].copy()
@@ -881,7 +878,7 @@ def prepare_for_partition_on_next_num_blocks(partition: Partition, partition_tri
             partition.block_degrees_in = partition_triplet.block_degrees_in[index].copy()
 
     partition_triplet.optimal_num_blocks_found = optimal_B_found
-    return partition, B_to_merge, partition_triplet
+    return partition, partition_triplet
 
 
 def plot_graph_with_partition(out_neighbors, b, graph_object=None, pos=None):

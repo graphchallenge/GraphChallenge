@@ -1,6 +1,9 @@
 """Contains code for the node reassignment part of the baseline algorithm.
 """
 
+from argparse import Namespace
+from typing import List
+
 import numpy as np
 
 from partition_baseline_support import compute_overall_entropy
@@ -15,9 +18,31 @@ from partition import Partition
 from partition import PartitionTriplet
 
 
-def reassign_nodes(partition: Partition, num_nodes: int, num_edges: int, out_neighbors: np.array,
-    in_neighbors: np.array, partition_triplet: PartitionTriplet, use_sparse_matrix: bool, verbose: bool) -> Partition:
+def reassign_nodes(partition: Partition, num_nodes: int, num_edges: int, out_neighbors: List[np.ndarray],
+    in_neighbors: List[np.ndarray], partition_triplet: PartitionTriplet, args: Namespace) -> Partition:
     """Reassigns nodes to different blocks based on Bayesian statistics.
+
+        Parameters
+        ---------
+        partition : Partition
+                the current partitioning results
+        num_nodes : int
+                the number of nodes in the graph
+        num_edges : int
+                the number of edges in the graph
+        out_neighbors : List[np.ndarray]
+                the list of outgoing edges per node
+        in_neighbors : List[np.ndarray]
+                the list of incoming edges per node
+        partition_triplet : PartitionTriplet
+                the triplet of partitions with the lowest overall entropy scores so far
+        args : Namespace
+                the command-line arguments
+
+        Returns
+        -------
+        partition : Partition
+                the updated partitioning results
     """
     # nodal partition updates parameters
     beta = 3  # exploitation versus exploration (higher value favors exploitation)
@@ -31,7 +56,7 @@ def reassign_nodes(partition: Partition, num_nodes: int, num_edges: int, out_nei
     itr_delta_entropy = np.zeros(max_num_nodal_itr)
 
     # compute the global entropy for MCMC convergence criterion
-    partition.overall_entropy = compute_overall_entropy(partition, num_nodes, num_edges, use_sparse_matrix)
+    partition.overall_entropy = compute_overall_entropy(partition, num_nodes, num_edges, args.sparse)
 
     for itr in range(max_num_nodal_itr):
         num_nodal_moves = 0
@@ -42,7 +67,7 @@ def reassign_nodes(partition: Partition, num_nodes: int, num_edges: int, out_nei
             # propose a new block for this node
             proposal, num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges = propose_new_partition(
                 current_block, out_neighbors[current_node], in_neighbors[current_node], partition.block_assignment,
-                partition, False, use_sparse_matrix)
+                partition, False, args.sparse)
 
             # determine whether to accept or reject the proposal
             if (proposal != current_block):
@@ -58,7 +83,7 @@ def reassign_nodes(partition: Partition, num_nodes: int, num_edges: int, out_nei
                     out_neighbors[current_node][:, 0] == current_node), 1])  # check if this node has a self edge
                 edge_count_updates = compute_new_rows_cols_interblock_edge_count_matrix(partition.interblock_edge_count, current_block, proposal,
                                                                     blocks_out, count_out, blocks_in, count_in,
-                                                                    self_edge_weight, 0, use_sparse_matrix)
+                                                                    self_edge_weight, 0, args.sparse)
 
                 # compute new block degrees
                 block_degrees_out_new, block_degrees_in_new, block_degrees_new = compute_new_block_degrees(
@@ -71,13 +96,13 @@ def reassign_nodes(partition: Partition, num_nodes: int, num_edges: int, out_nei
                                                                     edge_count_updates.block_row,
                                                                     edge_count_updates.block_col,
                                                                     partition.num_blocks, partition.block_degrees,
-                                                                    block_degrees_new, use_sparse_matrix)
+                                                                    block_degrees_new, args.sparse)
                 else: # if the node is an island, proposal is random and symmetric
                     Hastings_correction = 1
 
                 # compute change in entropy / posterior
                 delta_entropy = compute_delta_entropy(current_block, proposal, partition, edge_count_updates, 
-                                                    block_degrees_out_new, block_degrees_in_new, use_sparse_matrix)
+                                                    block_degrees_out_new, block_degrees_in_new, args.sparse)
 
                 # compute probability of acceptance
                 p_accept = np.min([np.exp(-beta * delta_entropy) * Hastings_correction, 1])
@@ -89,9 +114,9 @@ def reassign_nodes(partition: Partition, num_nodes: int, num_edges: int, out_nei
                     itr_delta_entropy[itr] += delta_entropy
                     partition = update_partition(partition, current_node, current_block, proposal, edge_count_updates,
                                                  block_degrees_out_new, block_degrees_in_new, block_degrees_new, 
-                                                 use_sparse_matrix)
+                                                 args.sparse)
 
-        if verbose:
+        if args.verbose:
             print("Itr: {}, number of nodal moves: {}, delta S: {:0.5f}".format(itr, num_nodal_moves,
                                                                                 itr_delta_entropy[itr] / float(
                                                                                     partition.overall_entropy)))
@@ -107,9 +132,9 @@ def reassign_nodes(partition: Partition, num_nodes: int, num_edges: int, out_nei
                     break
 
     # compute the global entropy for determining the optimal number of blocks
-    partition.overall_entropy = compute_overall_entropy(partition, num_nodes, num_edges, use_sparse_matrix)
+    partition.overall_entropy = compute_overall_entropy(partition, num_nodes, num_edges, args.sparse)
 
-    if verbose:
+    if args.verbose:
         print(
         "Total number of nodal moves: {}, overall_entropy: {:0.2f}".format(total_num_nodal_moves, partition.overall_entropy))
 

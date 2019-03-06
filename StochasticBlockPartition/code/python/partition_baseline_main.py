@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
     true_partition_available = True
     visualize_graph = False  # whether to plot the graph layout colored with intermediate partitions
-    verbose = True  # whether to print updates of the partitioning
+    # verbose = True  # whether to print updates of the partitioning
 
     if args.parts >= 1:
         print('\nLoading partition 1 of {} ({}) ...'.format(args.parts, input_filename + "_1.tsv"))
@@ -81,14 +81,14 @@ if __name__ == "__main__":
     else:
         out_neighbors, in_neighbors, N, E, true_partition = load_graph(input_filename, load_true_partition=true_partition_available)
 
-    if verbose:
+    if args.verbose:
         print('Number of nodes: {}'.format(N))
         print('Number of edges: {}'.format(E))
 
     if use_timeit:
         t0 = timeit.default_timer()
 
-    partition = Partition(N, out_neighbors, args.sparse)
+    partition = Partition(N, out_neighbors, args)
 
     # agglomerative partition update parameters
     # num_agg_proposals_per_block = 10  # number of proposals per block
@@ -96,7 +96,6 @@ if __name__ == "__main__":
 
     # initialize items before iterations to find the partition with the optimal number of blocks
     partition_triplet, graph_object = initialize_partition_variables()
-    num_blocks_to_merge = int(partition.num_blocks * args.blockReductionRate)
 
     # begin partitioning by finding the best partition with the optimal number of blocks
     while not partition_triplet.optimal_num_blocks_found:
@@ -104,29 +103,29 @@ if __name__ == "__main__":
         # BLOCK MERGING
         ##################
         # begin agglomerative partition updates (i.e. block merging)
-        if verbose:
-            print("\nMerging down blocks from {} to {}".format(partition.num_blocks, partition.num_blocks - num_blocks_to_merge))
+        if args.verbose:
+            print("\nMerging down blocks from {} to {}".format(partition.num_blocks, partition.num_blocks - partition.num_blocks_to_merge))
         
-        partition = merge_blocks(partition, args.blockProposals, args.sparse, num_blocks_to_merge, out_neighbors)
+        partition = merge_blocks(partition, args.blockProposals, args.sparse, out_neighbors)
 
         # perform nodal partition updates
         ############################
         # NODAL BLOCK UPDATES
         ############################
 
-        if verbose:
+        if args.verbose:
             print("Beginning nodal updates")
 
-        partition = reassign_nodes(partition, N, E, out_neighbors, in_neighbors, partition_triplet, args.sparse, args.verbose)
+        partition = reassign_nodes(partition, N, E, out_neighbors, in_neighbors, partition_triplet, args)
 
         if visualize_graph:
             graph_object = plot_graph_with_partition(out_neighbors, partition.block_assignment, graph_object)
 
         # check whether the partition with optimal number of block has been found; if not, determine and prepare for the next number of blocks to try
-        partition, num_blocks_to_merge, partition_triplet = prepare_for_partition_on_next_num_blocks(
+        partition, partition_triplet = prepare_for_partition_on_next_num_blocks(
             partition, partition_triplet, args.blockReductionRate)
 
-        if verbose:
+        if args.verbose:
             print('Overall entropy: {}'.format(partition_triplet.overall_entropy))
             print('Number of blocks: {}'.format(partition_triplet.num_blocks))
             if partition_triplet.optimal_num_blocks_found:
