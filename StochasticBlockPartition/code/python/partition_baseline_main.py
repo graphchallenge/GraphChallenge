@@ -2,9 +2,7 @@
 """
 
 from partition_baseline_support import *
-use_timeit = True # for timing runs (optional)
-if use_timeit:
-    import timeit
+import timeit
 import os, sys, argparse
 
 from partition import Partition
@@ -85,8 +83,7 @@ if __name__ == "__main__":
         print('Number of nodes: {}'.format(N))
         print('Number of edges: {}'.format(E))
 
-    if use_timeit:
-        t0 = timeit.default_timer()
+    t0 = timeit.default_timer()
 
     partition = Partition(N, out_neighbors, args)
 
@@ -131,9 +128,8 @@ if __name__ == "__main__":
             if partition_triplet.optimal_num_blocks_found:
                 print('\nOptimal partition found with {} blocks'.format(partition.num_blocks))
 
-    if use_timeit:
-        t1 = timeit.default_timer()
-        print('\nGraph partition took {} seconds'.format(t1 - t0))
+    t1 = timeit.default_timer()
+    print('\nGraph partition took {} seconds'.format(t1 - t0))
 
     # evaluate output partition against the true partition
     evaluate_partition(true_partition, partition.block_assignment)
