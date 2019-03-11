@@ -1,13 +1,19 @@
 """Runs the partitioning script.
 """
 
-from partition_baseline_support import *
 import timeit
 import os, sys, argparse
+
+# from partition_baseline_support import load_graph
+from partition_baseline_support import initialize_partition_variables
+from partition_baseline_support import plot_graph_with_partition
+from partition_baseline_support import prepare_for_partition_on_next_num_blocks
+from partition_baseline_support import evaluate_partition
 
 from partition import Partition
 from block_merge import merge_blocks
 from node_reassignment import reassign_nodes
+from graph import Graph
 
 
 def parse_arguments():
@@ -36,56 +42,23 @@ def parse_arguments():
 # End of parse_arguments()
 
 
-def build_filepath(args: argparse.Namespace) -> str:
-    """Builds the filename string.
-
-        Parameters
-        ---------
-        args : argparse.Namespace
-                the command-line arguments passed in
-        
-        Returns
-        ------
-        filepath : str
-                the path to the dataset base directory
-    """
-    filepath_base = "{0}/{1}/{2}Overlap_{3}BlockSizeVar/{1}_{2}Overlap_{3}BlockSizeVar_{4}_nodes".format(
-        args.directory, args.type, args.overlap, args.blockSizeVar, args.numNodes
-    )
-
-    if not os.path.isfile(filepath_base + '.tsv') and not os.path.isfile(filepath_base + '_1.tsv'):
-        print("File doesn't exist: '{}'!".format(filepath_base))
-        sys.exit(1)
-        
-    return filepath_base
-# End of build_filepath()
-
-
 if __name__ == "__main__":
     args = parse_arguments()
 
-    input_filename = build_filepath(args)
+    # input_filename = build_filepath(args)
 
     true_partition_available = True
     visualize_graph = False  # whether to plot the graph layout colored with intermediate partitions
-    # verbose = True  # whether to print updates of the partitioning
 
-    if args.parts >= 1:
-        print('\nLoading partition 1 of {} ({}) ...'.format(args.parts, input_filename + "_1.tsv"))
-        out_neighbors, in_neighbors, N, E, true_partition = load_graph(input_filename, load_true_partition=true_partition_available, strm_piece_num=1)
-        for part in range(2, args.parts + 1):
-            print('Loading partition {} of {} ({}) ...'.format(part, args.parts, input_filename + "_" + str(part) + ".tsv"))
-            out_neighbors, in_neighbors, N, E = load_graph(input_filename, load_true_partition=False, strm_piece_num=part, out_neighbors=out_neighbors, in_neighbors=in_neighbors)
-    else:
-        out_neighbors, in_neighbors, N, E, true_partition = load_graph(input_filename, load_true_partition=true_partition_available)
+    graph = Graph.load(args)
 
     if args.verbose:
-        print('Number of nodes: {}'.format(N))
-        print('Number of edges: {}'.format(E))
+        print('Number of nodes: {}'.format(graph.num_nodes))
+        print('Number of edges: {}'.format(graph.num_edges))
 
     t0 = timeit.default_timer()
 
-    partition = Partition(N, out_neighbors, args)
+    partition = Partition(graph.num_nodes, graph.out_neighbors, args)
 
     # agglomerative partition update parameters
     # num_agg_proposals_per_block = 10  # number of proposals per block
@@ -103,7 +76,7 @@ if __name__ == "__main__":
         if args.verbose:
             print("\nMerging down blocks from {} to {}".format(partition.num_blocks, partition.num_blocks - partition.num_blocks_to_merge))
         
-        partition = merge_blocks(partition, args.blockProposals, args.sparse, out_neighbors)
+        partition = merge_blocks(partition, args.blockProposals, args.sparse, graph.out_neighbors)
 
         # perform nodal partition updates
         ############################
@@ -113,10 +86,10 @@ if __name__ == "__main__":
         if args.verbose:
             print("Beginning nodal updates")
 
-        partition = reassign_nodes(partition, N, E, out_neighbors, in_neighbors, partition_triplet, args)
+        partition = reassign_nodes(partition, graph.num_nodes, graph.num_edges, graph.out_neighbors, graph.in_neighbors, partition_triplet, args)
 
         if visualize_graph:
-            graph_object = plot_graph_with_partition(out_neighbors, partition.block_assignment, graph_object)
+            graph_object = plot_graph_with_partition(graph.out_neighbors, partition.block_assignment, graph_object)
 
         # check whether the partition with optimal number of block has been found; if not, determine and prepare for the next number of blocks to try
         partition, partition_triplet = prepare_for_partition_on_next_num_blocks(
@@ -132,4 +105,4 @@ if __name__ == "__main__":
     print('\nGraph partition took {} seconds'.format(t1 - t0))
 
     # evaluate output partition against the true partition
-    evaluate_partition(true_partition, partition.block_assignment)
+    evaluate_partition(graph.true_block_assignment, partition.block_assignment)
