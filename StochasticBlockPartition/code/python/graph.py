@@ -69,10 +69,10 @@ class Graph():
         input_filename = _build_filepath(args)
         if args.parts >= 1:
             print('\nLoading partition 1 of {} ({}) ...'.format(args.parts, input_filename + "_1.tsv"))
-            graph = _load_graph(input_filename, load_true_partition=True, strm_piece_num=1)
+            graph = _load_graph(input_filename, load_true_partition=True, part_num=1)
             for part in range(2, args.parts + 1):
                 print('Loading partition {} of {} ({}) ...'.format(part, args.parts, input_filename + "_" + str(part) + ".tsv"))
-                graph.update(_load_graph(input_filename, load_true_partition=False, strm_piece_num=part, graph=graph))
+                graph.update(_load_graph(input_filename, load_true_partition=False, part_num=part, graph=graph))
         else:
             graph = _load_graph(input_filename, load_true_partition=True)
         return graph
@@ -105,7 +105,7 @@ def _build_filepath(args: argparse.Namespace) -> str:
 # End of build_filepath()
 
 
-def _load_graph(input_filename: str, load_true_partition: bool, strm_piece_num: Optional[int] = None, 
+def _load_graph(input_filename: str, load_true_partition: bool, part_num: Optional[int] = None, 
     graph: Optional[Graph] = None) -> Graph:
     """Load the graph from a TSV file with standard format, and the truth partition if available
 
@@ -115,11 +115,9 @@ def _load_graph(input_filename: str, load_true_partition: bool, strm_piece_num: 
                 input file name not including the .tsv extension
         true_partition_available : bool
                 whether the truth partition is available
-        strm_piece_num : int, optional
+        part_num : int, optional
                 specify which stage of the streaming graph to load
         graph : Graph, optional
-                the current Graph object, if Any
-        out_neighbors, in_neighbors : list of ndarray, optional
                 existing graph to add to. This is used when loading the streaming graphs one stage at a time. Note that
                 the truth partition is loaded all together at once.
 
@@ -134,11 +132,10 @@ def _load_graph(input_filename: str, load_true_partition: bool, strm_piece_num: 
         to N-1. If available, the true partition is stored in the file `filename_truePartition.tsv`.
     """
     # read the entire graph CSV into rows of edges
-    if (strm_piece_num == None):
-        edge_rows = pd.read_csv('{}.tsv'.format(input_filename), delimiter='\t', header=None).as_matrix()
+    if (part_num == None):
+        edge_rows = pd.read_csv('{}.tsv'.format(input_filename), delimiter='\t', header=None).values
     else:
-        edge_rows = pd.read_csv('{}_{}.tsv'.format(input_filename, strm_piece_num), delimiter='\t',
-                                header=None).as_matrix()
+        edge_rows = pd.read_csv('{}_{}.tsv'.format(input_filename, part_num), delimiter='\t', header=None).values
 
     if (graph == None):  # no previously loaded streaming pieces
         N = edge_rows[:, 0:2].max()  # number of nodes
@@ -179,7 +176,7 @@ def _load_graph(input_filename: str, load_true_partition: bool, strm_piece_num: 
     if load_true_partition:
         # read the entire true partition CSV into rows of partitions
         true_b_rows = pd.read_csv('{}_truePartition.tsv'.format(input_filename), delimiter='\t',
-                                  header=None).as_matrix()
+                                  header=None).values
         true_b = np.ones(true_b_rows.shape[0], dtype=int) * -1  # initialize truth assignment to -1 for 'unknown'
         for i in range(true_b_rows.shape[0]):
             true_b[true_b_rows[i, 0] - 1] = int(
