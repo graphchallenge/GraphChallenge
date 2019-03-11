@@ -45,20 +45,18 @@ def reassign_nodes(partition: Partition, num_nodes: int, num_edges: int, out_nei
                 the updated partitioning results
     """
     # nodal partition updates parameters
-    beta = 3  # exploitation versus exploration (higher value favors exploitation)
-    max_num_nodal_itr = 100  # maximum number of iterations
     delta_entropy_threshold1 = 5e-4  # stop iterating when the change in entropy falls below this fraction of the overall entropy
                                     # lowering this threshold results in more nodal update iterations and likely better performance, but longer runtime
     delta_entropy_threshold2 = 1e-4  # threshold after the golden ratio bracket is established (typically lower to fine-tune to partition)
     delta_entropy_moving_avg_window = 3  # width of the moving average window for the delta entropy convergence criterion
 
     total_num_nodal_moves = 0
-    itr_delta_entropy = np.zeros(max_num_nodal_itr)
+    itr_delta_entropy = np.zeros(args.iterations)
 
     # compute the global entropy for MCMC convergence criterion
     partition.overall_entropy = compute_overall_entropy(partition, num_nodes, num_edges, args.sparse)
 
-    for itr in range(max_num_nodal_itr):
+    for itr in range(args.iterations):
         num_nodal_moves = 0
         itr_delta_entropy[itr] = 0
 
@@ -105,7 +103,7 @@ def reassign_nodes(partition: Partition, num_nodes: int, num_edges: int, out_nei
                                                     block_degrees_out_new, block_degrees_in_new, args.sparse)
 
                 # compute probability of acceptance
-                p_accept = np.min([np.exp(-beta * delta_entropy) * Hastings_correction, 1])
+                p_accept = np.min([np.exp(-args.beta * delta_entropy) * Hastings_correction, 1])
 
                 # if accept the proposal, update the block_assignment, inter_block_edge_count, and block degrees
                 if (np.random.uniform() <= p_accept):
