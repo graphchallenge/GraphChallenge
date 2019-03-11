@@ -256,7 +256,7 @@ def compute_new_block_degrees(r, s, partition: Partition, k_out, k_in, k):
     return new
 
 
-def compute_Hastings_correction(b_out, count_out, b_in, count_in, s, M, M_r_row, M_r_col, B, d, d_new, use_sparse):
+def compute_Hastings_correction(b_out, count_out, b_in, count_in, s, partition: Partition, M_r_row, M_r_col, d_new, use_sparse):
     """Compute the Hastings correction for the proposed block from the current block
 
         Parameters
@@ -271,16 +271,12 @@ def compute_Hastings_correction(b_out, count_out, b_in, count_in, s, M, M_r_row,
                     edge counts to the in neighbor blocks
         s : int
                     proposed block assignment for the node under consideration
-        M : ndarray or sparse matrix (int), shape = (#blocks, #blocks)
-                    edge count matrix between all the blocks.
+        partition : Partition
+                    the current partitioning results
         M_r_row : ndarray or sparse matrix (int)
                     the current block row of the new edge count matrix under proposal
         M_r_col : ndarray or sparse matrix (int)
                     the current block col of the new edge count matrix under proposal
-        B : int
-                    total number of blocks
-        d : ndarray (int)
-                    total number of edges to and from each block
         d_new : ndarray (int)
                     new block degrees under the proposal
         use_sparse : bool
@@ -316,24 +312,25 @@ def compute_Hastings_correction(b_out, count_out, b_in, count_in, s, M, M_r_row,
 
         p_{i, s \rightarrow r} = \sum_{t \in \{\mathbf{b}_{\mathcal{N}_i}^-\}} \left[ {\frac{k_{i,t}}{k_i} \frac{M_{tr}^+ + M_{rt}^+ +1}{d_t^++B}}\right]
 
-        summed over all the neighboring blocks t"""
-
+        summed over all the neighboring blocks t
+    """
     t, idx = np.unique(np.append(b_out, b_in), return_inverse=True)  # find all the neighboring blocks
     count = np.bincount(idx, weights=np.append(count_out, count_in)).astype(int)  # count edges to neighboring blocks
     if use_sparse:
-        M_t_s = M[t, s].toarray().ravel()
-        M_s_t = M[s, t].toarray().ravel()
+        M_t_s = partition.interblock_edge_count[t, s].toarray().ravel()
+        M_s_t = partition.interblock_edge_count[s, t].toarray().ravel()
         M_r_row = M_r_row[0, t].toarray().ravel()
         M_r_col = M_r_col[t, 0].toarray().ravel()
     else:
-        M_t_s = M[t, s].ravel()
-        M_s_t = M[s, t].ravel()
+        M_t_s = partition.interblock_edge_count[t, s].ravel()
+        M_s_t = partition.interblock_edge_count[s, t].ravel()
         M_r_row = M_r_row[0, t].ravel()
         M_r_col = M_r_col[t, 0].ravel()
         
-    p_forward = np.sum(count*(M_t_s + M_s_t + 1) / (d[t] + float(B)))
-    p_backward = np.sum(count*(M_r_row + M_r_col + 1) / (d_new[t] + float(B)))
+    p_forward = np.sum(count*(M_t_s + M_s_t + 1) / (partition.block_degrees[t] + float(partition.num_blocks)))
+    p_backward = np.sum(count*(M_r_row + M_r_col + 1) / (d_new[t] + float(partition.num_blocks)))
     return p_backward / p_forward
+# End of compute_Hastings_correction()
 
 
 def compute_delta_entropy(r, s, partition: Partition, edge_count_updates: EdgeCountUpdates, d_out_new, d_in_new, use_sparse):

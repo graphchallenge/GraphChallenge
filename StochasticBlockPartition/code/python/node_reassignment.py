@@ -150,11 +150,9 @@ def propose_new_assignment(current_node: int, partition: Partition, out_neighbor
         # compute the Hastings correction
         if num_neighbor_edges>0:
             Hastings_correction = compute_Hastings_correction(blocks_out, count_out, blocks_in, count_in, proposal,
-                                                            partition.interblock_edge_count, 
-                                                            edge_count_updates.block_row,
-                                                            edge_count_updates.block_col,
-                                                            partition.num_blocks, partition.block_degrees,
-                                                            block_degrees_new, args.sparse)
+                                                            partition, edge_count_updates.block_row,
+                                                            edge_count_updates.block_col, block_degrees_new,
+                                                            args.sparse)
         else: # if the node is an island, proposal is random and symmetric
             Hastings_correction = 1
 
