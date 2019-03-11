@@ -20,6 +20,7 @@ if use_graph_tool_options:
     import graph_tool.all as gt
 
 from partition import Partition, PartitionTriplet
+# from graph import Graph
 
 
 class EdgeCountUpdates(object):
@@ -50,99 +51,6 @@ class EdgeCountUpdates(object):
         self.proposal_col = proposal_col
     # End of __init__()
 # End of EdgeCountUpdates()
-
-
-def load_graph(input_filename, load_true_partition, strm_piece_num=None, out_neighbors=None, in_neighbors=None):
-    """Load the graph from a TSV file with standard format, and the truth partition if available
-
-        Parameters
-        ----------
-        input_filename : str
-                input file name not including the .tsv extension
-        true_partition_available : bool
-                whether the truth partition is available
-        strm_piece_num : int, optional
-                specify which stage of the streaming graph to load
-        out_neighbors, in_neighbors : list of ndarray, optional
-                existing graph to add to. This is used when loading the streaming graphs one stage at a time. Note that
-                the truth partition is loaded all together at once.
-
-        Returns
-        -------
-        out_neighbors : list of ndarray; list length is N, the number of nodes
-                each element of the list is a ndarray of out neighbors, where the first column is the node indices
-                and the second column the corresponding edge weights
-        in_neighbors : list of ndarray; list length is N, the number of nodes
-                each element of the list is a ndarray of in neighbors, where the first column is the node indices
-                and the second column the corresponding edge weights
-        N : int
-                number of nodes in the graph
-        E : int
-                number of edges in the graph
-        true_b : ndarray (int) optional
-                array of truth block assignment for each node
-
-        Notes
-        -----
-        The standard tsv file has the form for each row: "from to [weight]" (tab delimited). Nodes are indexed from 0
-        to N-1. If available, the true partition is stored in the file `filename_truePartition.tsv`."""
-
-    # read the entire graph CSV into rows of edges
-    if (strm_piece_num == None):
-        edge_rows = pd.read_csv('{}.tsv'.format(input_filename), delimiter='\t', header=None).as_matrix()
-    else:
-        edge_rows = pd.read_csv('{}_{}.tsv'.format(input_filename, strm_piece_num), delimiter='\t',
-                                header=None).as_matrix()
-
-    if (out_neighbors == None):  # no previously loaded streaming pieces
-        N = edge_rows[:, 0:2].max()  # number of nodes
-        out_neighbors = [[] for i in range(N)]
-        in_neighbors = [[] for i in range(N)]
-    else:  # add to previously loaded streaming pieces
-        N = max(edge_rows[:, 0:2].max(), len(out_neighbors))  # number of nodes
-        out_neighbors = [list(out_neighbors[i]) for i in range(len(out_neighbors))]
-        out_neighbors.extend([[] for i in range(N - len(out_neighbors))])
-        in_neighbors = [list(in_neighbors[i]) for i in range(len(in_neighbors))]
-        in_neighbors.extend([[] for i in range(N - len(in_neighbors))])
-    weights_included = edge_rows.shape[1] == 3
-
-    # load edges to list of lists of out and in neighbors
-    for i in range(edge_rows.shape[0]):
-        if weights_included:
-            edge_weight = edge_rows[i, 2]
-        else:
-            edge_weight = 1
-        # -1 on the node index since Python is 0-indexed and the standard graph TSV is 1-indexed
-        out_neighbors[edge_rows[i, 0] - 1].append([edge_rows[i, 1] - 1, edge_weight])
-        in_neighbors[edge_rows[i, 1] - 1].append([edge_rows[i, 0] - 1, edge_weight])
-
-    # convert each neighbor list to neighbor numpy arrays for faster access
-    for i in range(N):
-        if len(out_neighbors[i]) > 0:
-            out_neighbors[i] = np.array(out_neighbors[i], dtype=int)
-        else:
-            out_neighbors[i] = np.array(out_neighbors[i], dtype=int).reshape((0,2))
-    for i in range(N):
-        if len(in_neighbors[i]) > 0:
-            in_neighbors[i] = np.array(in_neighbors[i], dtype=int)
-        else:
-            in_neighbors[i] = np.array(in_neighbors[i], dtype=int).reshape((0,2))
-
-    E = sum(len(v) for v in out_neighbors)  # number of edges
-
-    if load_true_partition:
-        # read the entire true partition CSV into rows of partitions
-        true_b_rows = pd.read_csv('{}_truePartition.tsv'.format(input_filename), delimiter='\t',
-                                  header=None).as_matrix()
-        true_b = np.ones(true_b_rows.shape[0], dtype=int) * -1  # initialize truth assignment to -1 for 'unknown'
-        for i in range(true_b_rows.shape[0]):
-            true_b[true_b_rows[i, 0] - 1] = int(
-                true_b_rows[i, 1] - 1)  # -1 since Python is 0-indexed and the TSV is 1-indexed
-
-    if load_true_partition:
-        return out_neighbors, in_neighbors, N, E, true_b
-    else:
-        return out_neighbors, in_neighbors, N, E
 
 
 def initialize_partition_variables():
@@ -180,54 +88,6 @@ def initialize_partition_variables():
     triplet = PartitionTriplet()
     graph_object = None
     return triplet, graph_object
-
-
-def initialize_edge_counts(out_neighbors, B, b, use_sparse):
-    """Initialize the edge count matrix and block degrees according to the current partition
-
-        Parameters
-        ----------
-        out_neighbors : list of ndarray; list length is N, the number of nodes
-                    each element of the list is a ndarray of out neighbors, where the first column is the node indices
-                    and the second column the corresponding edge weights
-        B : int
-                    total number of blocks in the current partition
-        b : ndarray (int)
-                    array of block assignment for each node
-        use_sparse : bool
-                    whether the edge count matrix is stored as a sparse matrix
-
-        Returns
-        -------
-        M : ndarray or sparse matrix (int), shape = (#blocks, #blocks)
-                    edge count matrix between all the blocks.
-        d_out : ndarray (int)
-                    the current out degree of each block
-        d_in : ndarray (int)
-                    the current in degree of each block
-        d : ndarray (int)
-                    the current total degree of each block
-
-        Notes
-        -----
-        Compute the edge count matrix and the block degrees from scratch"""
-
-    if use_sparse: # store interblock edge counts as a sparse matrix
-        M = sparse.lil_matrix((B, B), dtype=int)
-    else:
-        M = np.zeros((B, B), dtype=int)
-    # compute the initial interblock edge count
-    for v in range(len(out_neighbors)):
-        if len(out_neighbors[v]) > 0:
-            k1 = b[v]
-            k2, inverse_idx = np.unique(b[out_neighbors[v][:, 0]], return_inverse=True)
-            count = np.bincount(inverse_idx, weights=out_neighbors[v][:, 1]).astype(int)
-            M[k1, k2] += count
-    # compute initial block degrees
-    d_out = np.asarray(M.sum(axis=1)).ravel()
-    d_in = np.asarray(M.sum(axis=0)).ravel()
-    d = d_out + d_in
-    return M, d_out, d_in, d
 
 
 def propose_new_partition(r, neighbors_out, neighbors_in, b, partition: Partition, agg_move, use_sparse):
