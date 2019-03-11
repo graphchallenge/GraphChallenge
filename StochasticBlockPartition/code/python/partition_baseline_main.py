@@ -79,7 +79,7 @@ if __name__ == "__main__":
         if args.verbose:
             print("Beginning nodal updates")
 
-        partition = reassign_nodes(partition, graph.num_nodes, graph.num_edges, graph.out_neighbors, graph.in_neighbors, partition_triplet, args)
+        partition = reassign_nodes(partition, graph, partition_triplet, args)
 
         if visualize_graph:
             graph_object = plot_graph_with_partition(graph.out_neighbors, partition.block_assignment, graph_object)

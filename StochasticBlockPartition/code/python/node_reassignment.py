@@ -16,24 +16,19 @@ from partition_baseline_support import update_partition
 
 from partition import Partition
 from partition import PartitionTriplet
+from graph import Graph
 
 
-def reassign_nodes(partition: Partition, num_nodes: int, num_edges: int, out_neighbors: List[np.ndarray],
-    in_neighbors: List[np.ndarray], partition_triplet: PartitionTriplet, args: Namespace) -> Partition:
+def reassign_nodes(partition: Partition, graph: Graph, 
+    partition_triplet: PartitionTriplet, args: Namespace) -> Partition:
     """Reassigns nodes to different blocks based on Bayesian statistics.
 
         Parameters
         ---------
         partition : Partition
                 the current partitioning results
-        num_nodes : int
-                the number of nodes in the graph
-        num_edges : int
-                the number of edges in the graph
-        out_neighbors : List[np.ndarray]
-                the list of outgoing edges per node
-        in_neighbors : List[np.ndarray]
-                the list of incoming edges per node
+        graph : Graph
+                the loaded Graph object
         partition_triplet : PartitionTriplet
                 the triplet of partitions with the lowest overall entropy scores so far
         args : Namespace
@@ -54,14 +49,14 @@ def reassign_nodes(partition: Partition, num_nodes: int, num_edges: int, out_nei
     itr_delta_entropy = np.zeros(args.iterations)
 
     # compute the global entropy for MCMC convergence criterion
-    partition.overall_entropy = compute_overall_entropy(partition, num_nodes, num_edges, args.sparse)
+    partition.overall_entropy = compute_overall_entropy(partition, graph.num_nodes, graph.num_edges, args.sparse)
 
     for itr in range(args.iterations):
         num_nodal_moves = 0
         itr_delta_entropy[itr] = 0
 
-        for current_node in range(num_nodes):
-            p_accept, delta_entropy = propose_new_assignment(current_node, partition, out_neighbors, in_neighbors, args)
+        for current_node in range(graph.num_nodes):
+            p_accept, delta_entropy = propose_new_assignment(current_node, partition, graph, args)
             if p_accept >= 0.0:
                 total_num_nodal_moves += 1
                 num_nodal_moves += 1
@@ -84,7 +79,7 @@ def reassign_nodes(partition: Partition, num_nodes: int, num_edges: int, out_nei
                     break
 
     # compute the global entropy for determining the optimal number of blocks
-    partition.overall_entropy = compute_overall_entropy(partition, num_nodes, num_edges, args.sparse)
+    partition.overall_entropy = compute_overall_entropy(partition, graph.num_nodes, graph.num_edges, args.sparse)
 
     if args.verbose:
         print("Total number of nodal moves: {}, overall_entropy: {:0.2f}".format(
@@ -94,8 +89,8 @@ def reassign_nodes(partition: Partition, num_nodes: int, num_edges: int, out_nei
 # End of reassign_nodes()
 
 
-def propose_new_assignment(current_node: int, partition: Partition, out_neighbors: List[np.ndarray], 
-    in_neighbors: List[np.ndarray], args: Namespace) -> Tuple[float, float]:
+def propose_new_assignment(current_node: int, partition: Partition, graph: Graph, 
+    args: Namespace) -> Tuple[float, float]:
     """Proposes a block reassignment to for the given node.
 
         Parameters
@@ -104,10 +99,8 @@ def propose_new_assignment(current_node: int, partition: Partition, out_neighbor
                 the node for which to propose a reassignment
         partition : Partition
                 the current partitioning results
-        out_neighbors : List[np.ndarray]
-                the outgoing edges for every node
-        in_neighbors : List[np.ndarray]
-                the incoming edges for every node
+        graph : Graph
+                the Graph loaded from file
         args : Namespace
                 the command-line arguments provided
 
@@ -121,24 +114,23 @@ def propose_new_assignment(current_node: int, partition: Partition, out_neighbor
                 returns -1.0
     """
     current_block = partition.block_assignment[current_node]
-
+    out_neighbors = graph.out_neighbors[current_node]
+    in_neighbors = graph.in_neighbors[current_node]
     # propose a new block for this node
     proposal, num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges = propose_new_partition(
-        current_block, out_neighbors[current_node], in_neighbors[current_node], partition.block_assignment,
-        partition, False, args.sparse)
+        current_block, out_neighbors, in_neighbors, partition.block_assignment, partition, False, args.sparse)
 
     # determine whether to accept or reject the proposal
     if (proposal != current_block):
         # compute block counts of in and out neighbors
-        blocks_out, inverse_idx_out = np.unique(partition.block_assignment[out_neighbors[current_node][:, 0]],
-                                                return_inverse=True)
-        count_out = np.bincount(inverse_idx_out, weights=out_neighbors[current_node][:, 1]).astype(int)
-        blocks_in, inverse_idx_in = np.unique(partition.block_assignment[in_neighbors[current_node][:, 0]], return_inverse=True)
-        count_in = np.bincount(inverse_idx_in, weights=in_neighbors[current_node][:, 1]).astype(int)
+        blocks_out, inverse_idx_out = np.unique(partition.block_assignment[out_neighbors[:, 0]], return_inverse=True)
+        count_out = np.bincount(inverse_idx_out, weights=out_neighbors[:, 1]).astype(int)
+        blocks_in, inverse_idx_in = np.unique(partition.block_assignment[in_neighbors[:, 0]], return_inverse=True)
+        count_in = np.bincount(inverse_idx_in, weights=in_neighbors[:, 1]).astype(int)
 
         # compute the two new rows and columns of the interblock edge count matrix
-        self_edge_weight = np.sum(out_neighbors[current_node][np.where(
-            out_neighbors[current_node][:, 0] == current_node), 1])  # check if this node has a self edge
+        self_edge_weight = np.sum(out_neighbors[np.where(
+            out_neighbors[:, 0] == current_node), 1])  # check if this node has a self edge
         edge_count_updates = compute_new_rows_cols_interblock_edge_count_matrix(partition.interblock_edge_count, current_block, proposal,
                                                             blocks_out, count_out, blocks_in, count_in,
                                                             self_edge_weight, 0, args.sparse)
@@ -148,7 +140,7 @@ def propose_new_assignment(current_node: int, partition: Partition, out_neighbor
             current_block, proposal, partition, num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges)
 
         # compute the Hastings correction
-        if num_neighbor_edges>0:
+        if num_neighbor_edges > 0:
             Hastings_correction = compute_Hastings_correction(blocks_out, count_out, blocks_in, count_in, proposal,
                                                             partition, edge_count_updates.block_row,
                                                             edge_count_updates.block_col, block_degrees_new,
