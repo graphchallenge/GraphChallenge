@@ -53,43 +53,6 @@ class EdgeCountUpdates(object):
 # End of EdgeCountUpdates()
 
 
-def initialize_partition_variables():
-    """Initialize variables for the iterations to find the best partition with the optimal number of blocks
-
-        Returns
-        ------
-        partition: PartitionTriplet
-                    empty partition triplet, stores the 3 best partitions for Fibonacci search
-        graph_object : list
-                    empty for now and will store the graph object if graphs will be visualized
-
-
-        Previous Returns
-        -------
-        optimal_B_found : bool
-                    flag for whether the optimal block has been found
-        old_b : list of length 3
-                    holds the best three partitions so far
-        old_M : list of length 3
-                    holds the edge count matrices for the best three partitions so far
-        old_d : list of length 3
-                        holds the block degrees for the best three partitions so far
-        old_d_out : list of length 3
-                    holds the out block degrees for the best three partitions so far
-        old_d_in : list of length 3
-                    holds the in block degrees for the best three partitions so far
-        old_S : list of length 3
-                    holds the overall entropy for the best three partitions so far
-        old_B : list of length 3
-                    holds the number of blocks for the best three partitions so far
-        graph_object : list
-                    empty for now and will store the graph object if graphs will be visualized
-    """
-    triplet = PartitionTriplet()
-    graph_object = None
-    return triplet, graph_object
-
-
 def propose_new_partition(r, neighbors_out, neighbors_in, b, partition: Partition, agg_move, use_sparse):
     """Propose a new block assignment for the current node or block
 

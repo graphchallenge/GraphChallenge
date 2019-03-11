@@ -4,13 +4,11 @@
 import timeit
 import os, sys, argparse
 
-# from partition_baseline_support import load_graph
-from partition_baseline_support import initialize_partition_variables
 from partition_baseline_support import plot_graph_with_partition
 from partition_baseline_support import prepare_for_partition_on_next_num_blocks
 from partition_baseline_support import evaluate_partition
 
-from partition import Partition
+from partition import Partition, PartitionTriplet
 from block_merge import merge_blocks
 from node_reassignment import reassign_nodes
 from graph import Graph
@@ -60,12 +58,9 @@ if __name__ == "__main__":
 
     partition = Partition(graph.num_nodes, graph.out_neighbors, args)
 
-    # agglomerative partition update parameters
-    # num_agg_proposals_per_block = 10  # number of proposals per block
-    # num_block_reduction_rate = 0.5  # fraction of blocks to reduce until the golden ratio bracket is established
-
     # initialize items before iterations to find the partition with the optimal number of blocks
-    partition_triplet, graph_object = initialize_partition_variables()
+    partition_triplet = PartitionTriplet()
+    graph_object = None
 
     # begin partitioning by finding the best partition with the optimal number of blocks
     while not partition_triplet.optimal_num_blocks_found:
@@ -78,11 +73,9 @@ if __name__ == "__main__":
         
         partition = merge_blocks(partition, args.blockProposals, args.sparse, graph.out_neighbors)
 
-        # perform nodal partition updates
         ############################
         # NODAL BLOCK UPDATES
         ############################
-
         if args.verbose:
             print("Beginning nodal updates")
 
