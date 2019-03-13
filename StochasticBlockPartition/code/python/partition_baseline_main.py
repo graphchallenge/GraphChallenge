@@ -6,12 +6,12 @@ import os, sys, argparse
 
 from partition_baseline_support import plot_graph_with_partition
 from partition_baseline_support import prepare_for_partition_on_next_num_blocks
-from partition_baseline_support import evaluate_partition
 
 from partition import Partition, PartitionTriplet
 from block_merge import merge_blocks
 from node_reassignment import reassign_nodes
 from graph import Graph
+from evaluate import evaluate_partition, Evaluation
 
 
 def parse_arguments():
@@ -34,7 +34,7 @@ def parse_arguments():
     parser.add_argument("-r", "--blockReductionRate", type=float, default=0.5, help="The block reduction rate. Default = 0.5")
     parser.add_argument("--beta", type=int, default=3, help="exploitation vs exploration: higher threshold = higher exploration. Default = 3")
     parser.add_argument("--sparse", action="store_true", help="If supplied, will use Scipy's sparse matrix representation for the matrices.")
-    # parser.add_argument("input_filename", nargs="?", type=str, default="../../data/static/simulated_blockmodel_graph_500_nodes")
+    parser.add_argument("-c", "--csv", type=str, default="eval/benchmark.csv", help="The filepath to the csv file in which to store the evaluation results.")
     args = parser.parse_args()
     return args
 # End of parse_arguments()
@@ -42,8 +42,6 @@ def parse_arguments():
 
 if __name__ == "__main__":
     args = parse_arguments()
-
-    # input_filename = build_filepath(args)
 
     true_partition_available = True
     visualize_graph = False  # whether to plot the graph layout colored with intermediate partitions
@@ -54,7 +52,9 @@ if __name__ == "__main__":
         print('Number of nodes: {}'.format(graph.num_nodes))
         print('Number of edges: {}'.format(graph.num_edges))
 
-    t0 = timeit.default_timer()
+    evaluation = Evaluation(args, graph)
+
+    t_start = timeit.default_timer()
 
     partition = Partition(graph.num_nodes, graph.out_neighbors, args)
 
@@ -68,10 +68,14 @@ if __name__ == "__main__":
         # BLOCK MERGING
         ##################
         # begin agglomerative partition updates (i.e. block merging)
+        t_block_merge_start = timeit.default_timer()
+
         if args.verbose:
             print("\nMerging down blocks from {} to {}".format(partition.num_blocks, partition.num_blocks - partition.num_blocks_to_merge))
         
         partition = merge_blocks(partition, args.blockProposals, args.sparse, graph.out_neighbors)
+
+        t_nodal_update_start = timeit.default_timer()
 
         ############################
         # NODAL BLOCK UPDATES
@@ -88,14 +92,16 @@ if __name__ == "__main__":
         partition, partition_triplet = prepare_for_partition_on_next_num_blocks(
             partition, partition_triplet, args.blockReductionRate)
 
+        t_nodal_update_end = timeit.default_timer()
+
         if args.verbose:
             print('Overall entropy: {}'.format(partition_triplet.overall_entropy))
             print('Number of blocks: {}'.format(partition_triplet.num_blocks))
             if partition_triplet.optimal_num_blocks_found:
                 print('\nOptimal partition found with {} blocks'.format(partition.num_blocks))
 
-    t1 = timeit.default_timer()
-    print('\nGraph partition took {} seconds'.format(t1 - t0))
+    t_end = timeit.default_timer()
+    print('\nGraph partition took {} seconds'.format(t_end - t_start))
 
     # evaluate output partition against the true partition
-    evaluate_partition(graph.true_block_assignment, partition.block_assignment)
+    evaluate_partition(graph.true_block_assignment, partition.block_assignment, evaluation)
