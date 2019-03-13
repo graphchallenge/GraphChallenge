@@ -10,6 +10,8 @@
                Physical Review E 83, no. 1 (2011): 016107.
 """
 
+from typing import Tuple
+
 import pandas as pd
 import numpy as np
 from scipy import sparse as sparse
@@ -256,7 +258,8 @@ def compute_new_block_degrees(r, s, partition: Partition, k_out, k_in, k):
     return new
 
 
-def compute_Hastings_correction(b_out, count_out, b_in, count_in, s, partition: Partition, M_r_row, M_r_col, d_new, use_sparse):
+def compute_Hastings_correction(b_out, count_out, b_in, count_in, s, partition: Partition, M_r_row, M_r_col, d_new,
+    use_sparse) -> float:
     """Compute the Hastings correction for the proposed block from the current block
 
         Parameters
@@ -333,7 +336,8 @@ def compute_Hastings_correction(b_out, count_out, b_in, count_in, s, partition: 
 # End of compute_Hastings_correction()
 
 
-def compute_delta_entropy(r, s, partition: Partition, edge_count_updates: EdgeCountUpdates, d_out_new, d_in_new, use_sparse):
+def compute_delta_entropy(r, s, partition: Partition, edge_count_updates: EdgeCountUpdates, d_out_new, d_in_new,
+    use_sparse) -> float:
     """Compute change in entropy under the proposal. Reduced entropy means the proposed block is better than the current block.
 
         Parameters
@@ -571,7 +575,8 @@ def compute_overall_entropy(partition: Partition, N, E, use_sparse) -> float:
     return S
 
 
-def prepare_for_partition_on_next_num_blocks(partition: Partition, partition_triplet: PartitionTriplet, B_rate):
+def prepare_for_partition_on_next_num_blocks(partition: Partition, partition_triplet: PartitionTriplet,
+    B_rate: float) -> Tuple[Partition, PartitionTriplet]:
     """Checks to see whether the current partition has the optimal number of blocks. If not, the next number of blocks
        to try is determined and the intermediate variables prepared.
 
@@ -581,77 +586,15 @@ def prepare_for_partition_on_next_num_blocks(partition: Partition, partition_tri
                 the most recent partitioning results
         partition_triplet : Partition
                 the triplet of the three best partitioning results for Fibonacci search
+        B_rate : float
+                    the ratio on the number of blocks to reduce before the golden ratio bracket is established
 
         Returns:
         ----------
         partition : Partition
                 the partitioning results to use for the next iteration of the algorithm
-        partition_triplet : Partition
+        partition_triplet : PartitionTriplet
                 the updated triplet of the three best partitioning results for Fibonacci search
-
-        Old Parameters
-        ----------
-        b : ndarray (int)
-                    current array of block assignment for each node
-        M : ndarray or sparse matrix (int), shape = (#blocks, #blocks)
-                    edge count matrix between all the blocks.
-        d : ndarray (int)
-                    the current total degree of each block
-        d_out : ndarray (int)
-                    the current out degree of each block
-        d_in : ndarray (int)
-                    the current in degree of each block
-        B : int
-                    the number of blocks in the current partition
-        old_b : list of length 3
-                    holds the best three partitions so far
-        old_M : list of length 3
-                    holds the edge count matrices for the best three partitions so far
-        old_d : list of length 3
-                    holds the block degrees for the best three partitions so far
-        old_d_out : list of length 3
-                    holds the out block degrees for the best three partitions so far
-        old_d_in : list of length 3
-                    holds the in block degrees for the best three partitions so far
-        old_S : list of length 3
-                    holds the overall entropy for the best three partitions so far
-        old_B : list of length 3
-                    holds the number of blocks for the best three partitions so far
-        B_rate : float
-                    the ratio on the number of blocks to reduce before the golden ratio bracket is established
-
-        Old Returns
-        -------
-        b : ndarray (int)
-                starting array of block assignment on each node for the next number of blocks to try
-        M : ndarray or sparse matrix (int), shape = (#blocks, #blocks)
-                    starting edge count matrix for the next number of blocks to try
-        d : ndarray (int)
-                    the starting total degree of each block for the next number of blocks to try
-        d_out : ndarray (int)
-                    the starting out degree of each block for the next number of blocks to try
-        d_in : ndarray (int)
-                    the starting in degree of each block for the next number of blocks to try
-        B : int
-                    the starting number of blocks before the next block merge
-        B_to_merge : int
-                    number of blocks to merge next
-        old_b : list of length 3
-                    holds the best three partitions including the current partition
-        old_M : list of length 3
-                    holds the edge count matrices for the best three partitions including the current partition
-        old_d : list of length 3
-                    holds the block degrees for the best three partitions including the current partition
-        old_d_out : list of length 3
-                    holds the out block degrees for the best three partitions including the current partition
-        old_d_in : list of length 3
-                    holds the in block degrees for the best three partitions including the current partition
-        old_S : list of length 3
-                    holds the overall entropy for the best three partitions including the current partition
-        old_B : list of length 3
-                    holds the number of blocks for the best three partitions including the current partition
-        optimal_B_found : bool
-                    flag for whether the optimal block has been found
 
         Notes
         -----
@@ -662,9 +605,8 @@ def prepare_for_partition_on_next_num_blocks(partition: Partition, partition_tri
         the bracket is narrowed to consecutive number of blocks where the middle one is identified as the optimal
         number of blocks.
     """
-
     optimal_B_found = False
-    B_to_merge = 0
+    partition.num_blocks_to_merge = 0
 
     partition_triplet.update(partition)
 
@@ -699,6 +641,7 @@ def prepare_for_partition_on_next_num_blocks(partition: Partition, partition_tri
 
     partition_triplet.optimal_num_blocks_found = optimal_B_found
     return partition, partition_triplet
+# End of prepare_for_partition_on_next_num_blocks()
 
 
 def plot_graph_with_partition(out_neighbors, b, graph_object=None, pos=None):
@@ -749,6 +692,9 @@ def evaluate_partition(true_b, alg_b):
     """Evaluate the output partition against the truth partition and report the correctness metrics.
        Compare the partitions using only the nodes that have known truth block assignment.
 
+       Saves the results to a CSV file with the following headers:
+       blockSizeVariation, blockOverlap, numNodes, numEdges, numNodalUpdates, numIterations, numBlocksAlgo, numBlocksTrue, accuracy, randIndex, adjustedRandIndex, pairwiseRecall, pairwisePrecision, entropyTruth, entropyAlg, entropyTruth|Alg, entropyAlg|Truth, mutualInfo, missedInfo, erroneousInfo, totalTime, blockMergeTime, nodalUpdateTime
+
         Parameters
         ----------
         true_b : ndarray (int)
@@ -756,8 +702,8 @@ def evaluate_partition(true_b, alg_b):
                 to indicate unknown blocks.
         alg_b : ndarray (int)
                 array of output block assignment for each node. The length of this array corresponds to the number of
-                nodes observed and processed so far."""
-
+                nodes observed and processed so far.
+    """
     blocks_b1 = true_b
     blocks_b1_set = set(true_b)
     blocks_b1_set.discard(-1)  # -1 is the label for 'unknown'
@@ -790,7 +736,7 @@ def evaluate_partition(true_b, alg_b):
         total += contingency_table[row, row]
     # fill in the un-associated columns
     unassociated_col = set(range(contingency_table.shape[1])) - set(np.array(indexes)[:, 1])
-    counter = 0;
+    counter = 0
     for column in unassociated_col:
         contingency_table[:, contingency_table.shape[0] + counter] = contingency_table_before_assignment[:, column]
         counter += 1
