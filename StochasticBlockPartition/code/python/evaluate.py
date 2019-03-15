@@ -1,7 +1,7 @@
 """Contains code for evaluating the resulting partition.
 """
 
-from typing import Tuple, List
+from typing import Tuple, List, Callable
 from argparse import Namespace
 
 from munkres import Munkres # for correctness evaluation
@@ -64,7 +64,7 @@ class Evaluation(object):
 # End of Evaluation()
 
 
-def evaluate_partition(true_b: np.ndarray, alg_b: np.ndarray, eval: Evaluation):
+def evaluate_partition(true_b: np.ndarray, alg_b: np.ndarray, evaluation: Evaluation):
     """Evaluate the output partition against the truth partition and report the correctness metrics.
        Compare the partitions using only the nodes that have known truth block assignment.
 
@@ -76,43 +76,17 @@ def evaluate_partition(true_b: np.ndarray, alg_b: np.ndarray, eval: Evaluation):
         alg_b : ndarray (int)
                 array of output block assignment for each node. The length of this array corresponds to the number of
                 nodes observed and processed so far.
-        eval : Evaluation
+        evaluation : Evaluation
                 stores evaluation results
+        
+        Returns
+        ------
+        evaluation : Evaluation
+                the evaluation results, filled in with goodness of partitioning measures
     """
-    contingency_table, N = create_contingency_table(true_b, alg_b)
-    joint_prob = evaluate_accuracy(contingency_table, eval)
-
-    # Compute pair-counting-based metrics
-    def nchoose2(a):
-        return misc.comb(a, 2)
-
-    num_pairs = nchoose2(N)
-    colsum = np.sum(contingency_table, axis=0)
-    rowsum = np.sum(contingency_table, axis=1)
-    # compute counts of agreements and disagreement (4 types) and the regular rand index
-    sum_table_squared = sum(sum(contingency_table ** 2))
-    sum_colsum_squared = sum(colsum ** 2)
-    sum_rowsum_squared = sum(rowsum ** 2)
-    count_in_each_b1 = np.sum(contingency_table, axis=1)
-    count_in_each_b2 = np.sum(contingency_table, axis=0)
-    num_same_in_b1 = sum(count_in_each_b1 * (count_in_each_b1 - 1)) / 2
-    num_same_in_b2 = sum(count_in_each_b2 * (count_in_each_b2 - 1)) / 2
-    num_agreement_same = 0.5 * sum(sum(contingency_table * (contingency_table - 1)))
-    num_agreement_diff = 0.5 * (N ** 2 + sum_table_squared - sum_colsum_squared - sum_rowsum_squared)
-    num_agreement = num_agreement_same + num_agreement_diff
-    rand_index = num_agreement / num_pairs
-
-    vectorized_nchoose2 = np.vectorize(nchoose2)
-    sum_table_choose_2 = sum(sum(vectorized_nchoose2(contingency_table)))
-    sum_colsum_choose_2 = sum(vectorized_nchoose2(colsum))
-    sum_rowsum_choose_2 = sum(vectorized_nchoose2(rowsum))
-    adjusted_rand_index = (sum_table_choose_2 - sum_rowsum_choose_2 * sum_colsum_choose_2 / num_pairs) / (
-        0.5 * (sum_rowsum_choose_2 + sum_colsum_choose_2) - sum_rowsum_choose_2 * sum_colsum_choose_2 / num_pairs)
-    print('Rand Index: {}'.format(rand_index))
-    print('Adjusted Rand Index: {}'.format(adjusted_rand_index))
-    print('Pairwise Recall: {}'.format(num_agreement_same / (num_same_in_b1)))
-    print('Pairwise Precision: {}'.format(num_agreement_same / (num_same_in_b2)))
-    print('\n')
+    contingency_table, N = create_contingency_table(true_b, alg_b, evaluation)
+    joint_prob = evaluate_accuracy(contingency_table, evaluation)
+    evaluate_pairwise_metrics(contingency_table, N, evaluation)
 
     # compute the information theoretic metrics
     marginal_prob_b2 = np.sum(joint_prob, 0)
@@ -153,7 +127,7 @@ def evaluate_partition(true_b: np.ndarray, alg_b: np.ndarray, eval: Evaluation):
 # End of evaluate_partition()
 
 
-def create_contingency_table(true_b: np.ndarray, alg_b: np.ndarray) -> Tuple[np.ndarray, int]:
+def create_contingency_table(true_b: np.ndarray, alg_b: np.ndarray, evaluation: Evaluation) -> Tuple[np.ndarray, int]:
     """Creates the contingency table for the block assignment of the truth and algorithmically determined partitions..
     
         Parameters
@@ -164,6 +138,8 @@ def create_contingency_table(true_b: np.ndarray, alg_b: np.ndarray) -> Tuple[np.
         alg_b : ndarray (int)
                 array of output block assignment for each node. The length of this array corresponds to the number of
                 nodes observed and processed so far.
+        evaluation : Evaluation
+                stores the evaluation results
         
         Returns
         ------
@@ -179,6 +155,9 @@ def create_contingency_table(true_b: np.ndarray, alg_b: np.ndarray) -> Tuple[np.
 
     blocks_b2 = alg_b
     num_blocks_alg = max(blocks_b2) + 1
+
+    evaluation.num_blocks_algorithm = num_blocks_alg
+    evaluation.num_blocks_truth = num_blocks_truth
 
     print('\nPartition Correctness Evaluation\n')
     print('Number of nodes: {}'.format(len(alg_b)))
@@ -267,14 +246,16 @@ def fill_unassociated_columns(contingency_table: np.ndarray, contingency_table_b
     return contingency_table
 # End of fill_unassociated_columns()
 
-def evaluate_accuracy(contingency_table: np.ndarray, eval: Evaluation) -> np.ndarray:
+
+def evaluate_accuracy(contingency_table: np.ndarray, evaluation: Evaluation) -> np.ndarray:
     """Evaluates the accuracy of partitioning.
     
         Parameters
         ---------
         contingency_table : np.ndarray (int)
-                the contingency table (confusion matrix) comparing the true block assignment to the algorithmically determined block assignment
-        eval : Evaluation
+                the contingency table (confusion matrix) comparing the true block assignment to the algorithmically
+                determined block assignment
+        evaluation : Evaluation
                 stores evaluation results
         
         Returns
@@ -287,24 +268,113 @@ def evaluate_accuracy(contingency_table: np.ndarray, eval: Evaluation) -> np.nda
     accuracy = sum(joint_prob.diagonal())
     print('Accuracy (with optimal partition matching): {}'.format(accuracy))
     print()
-    eval.accuracy = accuracy
+    evaluation.accuracy = accuracy
     return joint_prob
 # End of evaluate_accuracy()
 
 
-def evaluate_pairwise_metrics(contingency_table: np.ndarray, eval: Evaluation):
-    """Evaluates the accuracy of partitioning.
+def evaluate_pairwise_metrics(contingency_table: np.ndarray, N: int, evaluation: Evaluation):
+    """Evaluates the pairwise metrics for goodness of the partitioning. Metrics evaluated:
+    rand index, adjusted rand index, pairwise recall, pairwise precision.
     
         Parameters
         ---------
         contingency_table : np.ndarray (int)
-                the contingency table (confusion matrix) comparing the true block assignment to the algorithmically determined block assignment
-        eval : Evaluation
+                the contingency table (confusion matrix) comparing the true block assignment to the algorithmically
+                determined block assignment
+        N : int
+                the number of nodes in the confusion matrix
+        evaluation : Evaluation
                 stores evaluation results
-        
-        Returns
-        -------
-        joint_prob : np.ndarray (float)
-                the normalized contingency table
     """
+    # Compute pair-counting-based metrics
+    def nchoose2(a):
+        return misc.comb(a, 2)
+
+    num_pairs = nchoose2(N)
+    colsum = np.sum(contingency_table, axis=0)
+    rowsum = np.sum(contingency_table, axis=1)
+    # compute counts of agreements and disagreement (4 types) and the regular rand index
+    count_in_each_b1 = np.sum(contingency_table, axis=1)
+    count_in_each_b2 = np.sum(contingency_table, axis=0)
+    num_same_in_b1 = sum(count_in_each_b1 * (count_in_each_b1 - 1)) / 2
+    num_same_in_b2 = sum(count_in_each_b2 * (count_in_each_b2 - 1)) / 2
+    num_agreement_same = 0.5 * sum(sum(contingency_table * (contingency_table - 1)))
+    num_agreement_diff = calc_num_agreement_diff(contingency_table, N, colsum, rowsum)
+    num_agreement = num_agreement_same + num_agreement_diff
+    rand_index = num_agreement / num_pairs
+
+    adjusted_rand_index = calc_adjusted_rand_index(contingency_table, nchoose2, colsum, rowsum, num_pairs)
+
+    evaluation.rand_index = rand_index
+    evaluation.adjusted_rand_index = adjusted_rand_index
+    evaluation.pairwise_recall = num_agreement_same / num_same_in_b1
+    evaluation.pairwise_precision = num_agreement_same / num_same_in_b2
+
+    print('Rand Index: {}'.format(rand_index))
+    print('Adjusted Rand Index: {}'.format(adjusted_rand_index))
+    print('Pairwise Recall: {}'.format(num_agreement_same / (num_same_in_b1)))
+    print('Pairwise Precision: {}'.format(num_agreement_same / (num_same_in_b2)))
+    print('\n')
 # End of evaluate_pairwise_metrics()
+
+
+def calc_num_agreement_diff(contingency_table: np.ndarray, N: int, colsum: np.ndarray, rowsum: np.ndarray) -> float:
+    """Calculates the number of nodes that are different blocks in both the true and algorithmic block assignment.
+
+        Parameters
+        ---------
+        contingency_table : np.ndarray (int)
+                the contingency table (confusion matrix) comparing the true block assignment to the algorithmically
+                determined block assignment
+        N : int
+                the number of nodes in the confusion matrix
+        colsum : np.ndarray (int)
+                the sum of values across the columns of the contingency table
+        rowsum : np.ndarray (int)
+                the sum of values across the rows of the contingency table
+
+        Returns
+        ------
+        num_agreement_diff : float
+                the number of nodes that are in different blocks in both the true and algorithmic block assignment
+    """
+    sum_table_squared = sum(sum(contingency_table ** 2))
+    sum_colsum_squared = sum(colsum ** 2)
+    sum_rowsum_squared = sum(rowsum ** 2)
+    num_agreement_diff = 0.5 * (N ** 2 + sum_table_squared - sum_colsum_squared - sum_rowsum_squared)
+    return num_agreement_diff
+# End of calc_num_agreement_diff()
+
+
+def calc_adjusted_rand_index(contingency_table: np.ndarray, nchoose2: Callable, colsum: np.ndarray, 
+    rowsum: np.ndarray, num_pairs: int) -> float:
+    """Calculates the adjusted rand index for the given contingency table.
+
+        Parameters
+        ---------
+        contingency_table : np.ndarray (int)
+                the contingency table (confusion matrix) comparing the true block assignment to the algorithmically
+                determined block assignment
+        nchoose2 : Callable
+                the n choose 2 function
+        colsum : np.ndarray (int)
+                the sum of values across the columns of the contingency table
+        rowsum : np.ndarray (int)
+                the sum of values across the rows of the contingency table
+        num_pairs : int
+                the number of pairs (result of nchoose2(num_nodes_in_contingency_table))
+
+        Returns
+        ------
+        adjusted_rand_index : float
+                the adjusted rand index calculated here
+    """
+    vectorized_nchoose2 = np.vectorize(nchoose2)
+    sum_table_choose_2 = sum(sum(vectorized_nchoose2(contingency_table)))
+    sum_colsum_choose_2 = sum(vectorized_nchoose2(colsum))
+    sum_rowsum_choose_2 = sum(vectorized_nchoose2(rowsum))
+    adjusted_rand_index = (sum_table_choose_2 - sum_rowsum_choose_2 * sum_colsum_choose_2 / num_pairs) / (
+        0.5 * (sum_rowsum_choose_2 + sum_colsum_choose_2) - sum_rowsum_choose_2 * sum_colsum_choose_2 / num_pairs)
+    return adjusted_rand_index
+# End of calc_adjusted_rand_index()
