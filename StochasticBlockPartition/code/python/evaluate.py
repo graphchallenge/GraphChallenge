@@ -1,7 +1,7 @@
 """Contains code for evaluating the resulting partition.
 """
 
-from typing import Tuple
+from typing import Tuple, List
 from argparse import Namespace
 
 from munkres import Munkres # for correctness evaluation
@@ -25,17 +25,19 @@ class Evaluation(object):
             graph : Graph
                     the loaded graph to be partitioned
         """
+        # CSV file into which to write the results
+        self.csv_file = args.csv
+        # Dataset parameters
         self.block_size_variation = args.blockSizeVar
         self.block_overlap = args.overlap
         self.streaming_type = args.type
+        self.num_nodes = graph.num_nodes
+        self.num_edges = graph.num_edges
+        # Algorithm parameters
         self.num_block_proposals = args.blockProposals
         self.beta = args.beta
         self.sparse = args.sparse
-        self.csv_file = args.csv
-        self.num_nodes = graph.num_nodes
-        self.num_edges = graph.num_edges
-        self.num_nodal_updates = 0
-        self.num_iterations = 0
+        # Goodness of partition measures
         self.num_blocks_algorithm = 0
         self.num_blocks_truth = 0
         self.accuracy = 0.0
@@ -50,9 +52,14 @@ class Evaluation(object):
         self.mutual_info = 0.0
         self.missed_info = 0.0
         self.erroneous_info = 0.0
+        # Algorithm runtime measures
+        self.num_nodal_updates = 0
+        self.num_iterations = 0
         self.total_partition_time = 0.0
         self.total_block_merge_time = 0.0
         self.total_nodal_update_time = 0.0
+        self.block_merge_times = list()  # type: List[int]
+        self.nodal_update_times = list()  # type: List[int]
     # End of __init__()
 # End of Evaluation()
 
@@ -72,14 +79,13 @@ def evaluate_partition(true_b: np.ndarray, alg_b: np.ndarray, eval: Evaluation):
         eval : Evaluation
                 stores evaluation results
     """
-    contingency_table = create_contingency_table(true_b, alg_b)
+    contingency_table, N = create_contingency_table(true_b, alg_b)
     joint_prob = evaluate_accuracy(contingency_table, eval)
 
     # Compute pair-counting-based metrics
     def nchoose2(a):
         return misc.comb(a, 2)
 
-    N = eval.num_nodes
     num_pairs = nchoose2(N)
     colsum = np.sum(contingency_table, axis=0)
     rowsum = np.sum(contingency_table, axis=1)
@@ -169,44 +175,97 @@ def create_contingency_table(true_b: np.ndarray, alg_b: np.ndarray) -> Tuple[np.
     blocks_b1 = true_b
     blocks_b1_set = set(true_b)
     blocks_b1_set.discard(-1)  # -1 is the label for 'unknown'
-    B_b1 = len(blocks_b1_set)
+    num_blocks_truth = len(blocks_b1_set)
 
     blocks_b2 = alg_b
-    B_b2 = max(blocks_b2) + 1
+    num_blocks_alg = max(blocks_b2) + 1
 
     print('\nPartition Correctness Evaluation\n')
     print('Number of nodes: {}'.format(len(alg_b)))
-    print('Number of partitions in truth partition: {}'.format(B_b1))
-    print('Number of partitions in alg. partition: {}'.format(B_b2))
+    print('Number of partitions in truth partition: {}'.format(num_blocks_truth))
+    print('Number of partitions in alg. partition: {}'.format(num_blocks_alg))
+
     # populate the confusion matrix between the two partitions
-    contingency_table = np.zeros((B_b1, B_b2))
+    contingency_table = np.zeros((num_blocks_truth, num_blocks_alg))
     for i in range(len(alg_b)):  # evaluation based on nodes observed so far
         if true_b[i] != -1:  # do not include nodes without truth in the evaluation
             contingency_table[blocks_b1[i], blocks_b2[i]] += 1
     N = contingency_table.sum()
 
+    if num_blocks_truth > num_blocks_alg:  # transpose matrix for linear assignment (this implementation assumes #col >= #row)
+        contingency_table = contingency_table.transpose()
+    contingency_table_before_assignment = np.array(contingency_table)
+
+    # associate the labels between two partitions using linear assignment
+    contingency_table, indexes = associate_labels(contingency_table, contingency_table_before_assignment)
+
+    # fill in the un-associated columns
+    contingency_table = fill_unassociated_columns(contingency_table, contingency_table_before_assignment, indexes)
+
+    if num_blocks_truth > num_blocks_alg:  # transpose back
+        contingency_table = contingency_table.transpose()
+    print('Contingency Table: \n{}'.format(contingency_table))
+    return contingency_table, N
+# End of create_contingency_table()
+
+
+def associate_labels(contingency_table: np.ndarray,
+    contingency_table_before_assignment: np.ndarray) -> Tuple[np.ndarray, List[Tuple[int,int]]]:
+    """Uses linear assignment through Munkres to correctly pair up the block numbers in the truth and algorithmic
+    partitions.
+
+        Parameters
+        ---------
+        contingency_table : np.ndarray (int)
+                the un-matched contingency table, will be modified in this function
+        contingency_table_before_assignment : np.ndarray (int)
+                the un-matched contingency table, will not be modified in this function
+        
+        Returns
+        ------
+        contingency_table : np.ndarray (int)
+                the contingency table, after the rows and columns have been properly matched using Munkres
+        indexes : List[Tuple[int,int]]
+                the indexes for traversing the matrix, as determined by Munkres
+    """
     # associate the labels between two partitions using linear assignment
     assignment = Munkres()  # use the Hungarian algorithm / Kuhn-Munkres algorithm
-    if B_b1 > B_b2:  # transpose matrix for linear assignment (this implementation assumes #col >= #row)
-        contingency_table = contingency_table.transpose()
     indexes = assignment.compute(-contingency_table)
     total = 0
-    contingency_table_before_assignment = np.array(contingency_table)
     for row, column in indexes:
         contingency_table[:, row] = contingency_table_before_assignment[:, column]
         total += contingency_table[row, row]
+    return contingency_table, indexes
+# End of associate_labels()
+
+
+def fill_unassociated_columns(contingency_table: np.ndarray, contingency_table_before_assignment: np.ndarray,
+    indexes: List[Tuple[int,int]]) -> np.ndarray:
+    """Uses linear assignment through Munkres to correctly pair up the block numbers in the truth and algorithmic
+    partitions.
+
+        Parameters
+        ---------
+        contingency_table : np.ndarray (int)
+                the current contingency table, will be modified in this function
+        contingency_table_before_assignment : np.ndarray (int)
+                the un-matched contingency table, will not be modified in this function
+        indexes : List[Tuple[int,int]]
+                the list of indexes for traversing the matrix, as determined by Munkres
+        
+        Returns
+        ------
+        contingency_table : np.ndarray (int)
+                the contingency table, after the rows and columns have been properly matched using Munkres
+    """
     # fill in the un-associated columns
     unassociated_col = set(range(contingency_table.shape[1])) - set(np.array(indexes)[:, 1])
     counter = 0
     for column in unassociated_col:
         contingency_table[:, contingency_table.shape[0] + counter] = contingency_table_before_assignment[:, column]
         counter += 1
-    if B_b1 > B_b2:  # transpose back
-        contingency_table = contingency_table.transpose()
-    print('Contingency Table: \n{}'.format(contingency_table))
     return contingency_table
-# End of create_contingency_table()
-
+# End of fill_unassociated_columns()
 
 def evaluate_accuracy(contingency_table: np.ndarray, eval: Evaluation) -> np.ndarray:
     """Evaluates the accuracy of partitioning.
