@@ -87,43 +87,44 @@ def evaluate_partition(true_b: np.ndarray, alg_b: np.ndarray, evaluation: Evalua
     contingency_table, N = create_contingency_table(true_b, alg_b, evaluation)
     joint_prob = evaluate_accuracy(contingency_table, evaluation)
     evaluate_pairwise_metrics(contingency_table, N, evaluation)
+    evaluate_entropy_metrics(joint_prob, evaluation)
 
-    # compute the information theoretic metrics
-    marginal_prob_b2 = np.sum(joint_prob, 0)
-    marginal_prob_b1 = np.sum(joint_prob, 1)
-    idx1 = np.nonzero(marginal_prob_b1)
-    idx2 = np.nonzero(marginal_prob_b2)
-    conditional_prob_b2_b1 = np.zeros(joint_prob.shape)
-    conditional_prob_b1_b2 = np.zeros(joint_prob.shape)
-    conditional_prob_b2_b1[idx1, :] = joint_prob[idx1, :] / marginal_prob_b1[idx1, None]
-    conditional_prob_b1_b2[:, idx2] = joint_prob[:, idx2] / marginal_prob_b2[None, idx2]
-    # compute entropy of the non-partition2 and the partition2 version
-    H_b2 = -np.sum(marginal_prob_b2[idx2] * np.log(marginal_prob_b2[idx2]))
-    H_b1 = -np.sum(marginal_prob_b1[idx1] * np.log(marginal_prob_b1[idx1]))
+    # # compute the information theoretic metrics
+    # marginal_prob_b2 = np.sum(joint_prob, 0)
+    # marginal_prob_b1 = np.sum(joint_prob, 1)
+    # idx1 = np.nonzero(marginal_prob_b1)
+    # idx2 = np.nonzero(marginal_prob_b2)
+    # conditional_prob_b2_b1 = np.zeros(joint_prob.shape)
+    # conditional_prob_b1_b2 = np.zeros(joint_prob.shape)
+    # conditional_prob_b2_b1[idx1, :] = joint_prob[idx1, :] / marginal_prob_b1[idx1, None]
+    # conditional_prob_b1_b2[:, idx2] = joint_prob[:, idx2] / marginal_prob_b2[None, idx2]
+    # # compute entropy of the non-partition2 and the partition2 version
+    # H_b2 = -np.sum(marginal_prob_b2[idx2] * np.log(marginal_prob_b2[idx2]))
+    # H_b1 = -np.sum(marginal_prob_b1[idx1] * np.log(marginal_prob_b1[idx1]))
 
-    # compute the conditional entropies
-    idx = np.nonzero(joint_prob)
-    H_b2_b1 = -np.sum(np.sum(joint_prob[idx] * np.log(conditional_prob_b2_b1[idx])))
-    H_b1_b2 = -np.sum(np.sum(joint_prob[idx] * np.log(conditional_prob_b1_b2[idx])))
-    # compute the mutual information (symmetric)
-    marginal_prod = np.dot(marginal_prob_b1[:, None], np.transpose(marginal_prob_b2[:, None]))
-    MI_b1_b2 = np.sum(np.sum(joint_prob[idx] * np.log(joint_prob[idx] / marginal_prod[idx])))
+    # # compute the conditional entropies
+    # idx = np.nonzero(joint_prob)
+    # H_b2_b1 = -np.sum(np.sum(joint_prob[idx] * np.log(conditional_prob_b2_b1[idx])))
+    # H_b1_b2 = -np.sum(np.sum(joint_prob[idx] * np.log(conditional_prob_b1_b2[idx])))
+    # # compute the mutual information (symmetric)
+    # marginal_prod = np.dot(marginal_prob_b1[:, None], np.transpose(marginal_prob_b2[:, None]))
+    # MI_b1_b2 = np.sum(np.sum(joint_prob[idx] * np.log(joint_prob[idx] / marginal_prod[idx])))
 
-    if H_b1 > 0:
-        fraction_missed_info = H_b1_b2 / H_b1
-    else:
-        fraction_missed_info = 0
-    if H_b2 > 0:
-        fraction_err_info = H_b2_b1 / H_b2
-    else:
-        fraction_err_info = 0
-    print('Entropy of truth partition: {}'.format(abs(H_b1)))
-    print('Entropy of alg. partition: {}'.format(abs(H_b2)))
-    print('Conditional entropy of truth partition given alg. partition: {}'.format(abs(H_b1_b2)))
-    print('Conditional entropy of alg. partition given truth partition: {}'.format(abs(H_b2_b1)))
-    print('Mutual informationion between truth partition and alg. partition: {}'.format(abs(MI_b1_b2)))
-    print('Fraction of missed information: {}'.format(abs(fraction_missed_info)))
-    print('Fraction of erroneous information: {}'.format(abs(fraction_err_info)))
+    # if H_b1 > 0:
+    #     fraction_missed_info = H_b1_b2 / H_b1
+    # else:
+    #     fraction_missed_info = 0
+    # if H_b2 > 0:
+    #     fraction_err_info = H_b2_b1 / H_b2
+    # else:
+    #     fraction_err_info = 0
+    # print('Entropy of truth partition: {}'.format(abs(H_b1)))
+    # print('Entropy of alg. partition: {}'.format(abs(H_b2)))
+    # print('Conditional entropy of truth partition given alg. partition: {}'.format(abs(H_b1_b2)))
+    # print('Conditional entropy of alg. partition given truth partition: {}'.format(abs(H_b2_b1)))
+    # print('Mutual informationion between truth partition and alg. partition: {}'.format(abs(MI_b1_b2)))
+    # print('Fraction of missed information: {}'.format(abs(fraction_missed_info)))
+    # print('Fraction of erroneous information: {}'.format(abs(fraction_err_info)))
 # End of evaluate_partition()
 
 
@@ -378,3 +379,52 @@ def calc_adjusted_rand_index(contingency_table: np.ndarray, nchoose2: Callable, 
         0.5 * (sum_rowsum_choose_2 + sum_colsum_choose_2) - sum_rowsum_choose_2 * sum_colsum_choose_2 / num_pairs)
     return adjusted_rand_index
 # End of calc_adjusted_rand_index()
+
+
+def evaluate_entropy_metrics(joint_prob: np.ndarray, evaluation: Evaluation):
+    """Evaluates the entropy (information theoretics based) goodness of partition metrics.
+
+        Parameters
+        ---------
+        joint_prob : np.ndarray
+                the normalized contingency table
+        evaluation : Evaluation
+                stores the evaluation metrics
+    """
+    # compute the information theoretic metrics
+    marginal_prob_b2 = np.sum(joint_prob, 0)
+    marginal_prob_b1 = np.sum(joint_prob, 1)
+    idx1 = np.nonzero(marginal_prob_b1)
+    idx2 = np.nonzero(marginal_prob_b2)
+    conditional_prob_b2_b1 = np.zeros(joint_prob.shape)
+    conditional_prob_b1_b2 = np.zeros(joint_prob.shape)
+    conditional_prob_b2_b1[idx1, :] = joint_prob[idx1, :] / marginal_prob_b1[idx1, None]
+    conditional_prob_b1_b2[:, idx2] = joint_prob[:, idx2] / marginal_prob_b2[None, idx2]
+    # compute entropy of the non-partition2 and the partition2 version
+    H_b2 = -np.sum(marginal_prob_b2[idx2] * np.log(marginal_prob_b2[idx2]))
+    H_b1 = -np.sum(marginal_prob_b1[idx1] * np.log(marginal_prob_b1[idx1]))
+
+    # compute the conditional entropies
+    idx = np.nonzero(joint_prob)
+    H_b2_b1 = -np.sum(np.sum(joint_prob[idx] * np.log(conditional_prob_b2_b1[idx])))
+    H_b1_b2 = -np.sum(np.sum(joint_prob[idx] * np.log(conditional_prob_b1_b2[idx])))
+    # compute the mutual information (symmetric)
+    marginal_prod = np.dot(marginal_prob_b1[:, None], np.transpose(marginal_prob_b2[:, None]))
+    MI_b1_b2 = np.sum(np.sum(joint_prob[idx] * np.log(joint_prob[idx] / marginal_prod[idx])))
+
+    if H_b1 > 0:
+        fraction_missed_info = H_b1_b2 / H_b1
+    else:
+        fraction_missed_info = 0
+    if H_b2 > 0:
+        fraction_err_info = H_b2_b1 / H_b2
+    else:
+        fraction_err_info = 0
+    print('Entropy of truth partition: {}'.format(abs(H_b1)))
+    print('Entropy of alg. partition: {}'.format(abs(H_b2)))
+    print('Conditional entropy of truth partition given alg. partition: {}'.format(abs(H_b1_b2)))
+    print('Conditional entropy of alg. partition given truth partition: {}'.format(abs(H_b2_b1)))
+    print('Mutual informationion between truth partition and alg. partition: {}'.format(abs(MI_b1_b2)))
+    print('Fraction of missed information: {}'.format(abs(fraction_missed_info)))
+    print('Fraction of erroneous information: {}'.format(abs(fraction_err_info)))
+# End of evaluate_entropy_metrics()
