@@ -396,16 +396,16 @@ def evaluate_entropy_metrics(joint_prob: np.ndarray, evaluation: Evaluation):
     marginal_prob_b1 = np.sum(joint_prob, 1)
     idx_truth = np.nonzero(marginal_prob_b1)
     idx_alg = np.nonzero(marginal_prob_b2)
-    H_b1, H_b2 = calc_entropy(marginal_prob_b1, marginal_prob_b2, idx_truth, idx_alg, evaluation)
+    evaluation = calc_entropy(marginal_prob_b1, marginal_prob_b2, idx_truth, idx_alg, evaluation)
     evaluation = calc_conditional_entropy(joint_prob, marginal_prob_b1, marginal_prob_b2, idx_truth, idx_alg,
                                           evaluation)
 
-    if H_b1 > 0:
-        fraction_missed_info = evaluation.entropy_truth_given_algorithm / H_b1
+    if evaluation.entropy_truth > 0:
+        fraction_missed_info = evaluation.entropy_truth_given_algorithm / evaluation.entropy_truth
     else:
         fraction_missed_info = 0
-    if H_b2 > 0:
-        fraction_err_info = evaluation.entropy_algorithm_given_truth / H_b2
+    if evaluation.entropy_algorithm > 0:
+        fraction_err_info = evaluation.entropy_algorithm_given_truth / evaluation.entropy_algorithm
     else:
         fraction_err_info = 0
 
@@ -415,7 +415,7 @@ def evaluate_entropy_metrics(joint_prob: np.ndarray, evaluation: Evaluation):
 
 
 def calc_entropy(p_marginal_truth: np.ndarray, p_marginal_alg: np.ndarray, idx_truth: np.ndarray,
-    idx_alg: np.ndarray, evaluation: Evaluation) -> Tuple[float, float]:
+    idx_alg: np.ndarray, evaluation: Evaluation) -> Evaluation:
     """Calculates the entropy of the truth and algorithm partitions.
 
         Parameters
@@ -431,10 +431,8 @@ def calc_entropy(p_marginal_truth: np.ndarray, p_marginal_alg: np.ndarray, idx_t
 
         Returns
         ------
-        entropy_truth : float
-                the entropy of the truth partition
-        entropy_alg : float
-                the entropy of the algorithm partition
+        evaluation : Evaluation
+                the evaluation object, updated with the entropy metrics
     """
     # compute entropy of the non-partition2 and the partition2 version
     entropy_truth = -np.sum(p_marginal_truth[idx_truth] * np.log(p_marginal_truth[idx_truth]))
@@ -443,7 +441,7 @@ def calc_entropy(p_marginal_truth: np.ndarray, p_marginal_alg: np.ndarray, idx_t
     print('Entropy of alg. partition: {}'.format(abs(entropy_alg)))
     evaluation.entropy_truth = entropy_truth
     evaluation.entropy_algorithm = entropy_alg
-    return entropy_truth, entropy_alg
+    return evaluation
 # End of calc_entropy()
 
 
