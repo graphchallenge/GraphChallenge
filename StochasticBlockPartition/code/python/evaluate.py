@@ -92,9 +92,39 @@ class Evaluation(object):
         self.total_partition_time = 0.0
         self.total_block_merge_time = 0.0
         self.total_nodal_update_time = 0.0
-        self.block_merge_times = list()  # type: List[int]
-        self.nodal_update_times = list()  # type: List[int]
     # End of __init__()
+
+    def update_timings(self, block_merge_start_t: float, node_update_start_t: float, node_update_end_t: float):
+        """Updates the timings of a single iteration (block merge + nodal updates)
+
+            Parameters
+            ---------
+            block_merge_start_t : float
+                    the start time of the block merge step
+            node_update_start_t : float
+                    the start time of the nodal update step
+            node_update_end_t : float
+                    the end time of the nodal update step
+        """
+        block_merge_t = node_update_start_t - block_merge_start_t
+        node_update_t = node_update_end_t - node_update_start_t
+        self.total_block_merge_time += block_merge_t
+        self.total_nodal_update_time += node_update_t
+    # End of update_timings()
+
+    def total_runtime(self, start_t: float, end_t: float):
+        """Finalizes the runtime of the algorithm.
+
+            Parameters
+            ---------
+            start_t : float
+                    the start time of the partitioning
+            end_t : float
+                    the end time of the partitioning
+        """
+        runtime = end_t - start_t
+        self.total_partition_time = runtime
+    # End of total_runtime()
 
     def save(self):
         """Saves the evaluation to a CSV file. Creates a new CSV file one the path of csv_file doesn't exist. Appends
@@ -104,7 +134,7 @@ class Evaluation(object):
         if not os.path.isfile(self.csv_file):
             directory = os.path.dirname(self.csv_file)
             if directory not in [".", ""]:
-                os.makedirs(directory)
+                os.makedirs(directory, exist_ok=True)
             write_header = True
         with open(self.csv_file, "a") as csv_file:
             writer = csv.writer(csv_file)

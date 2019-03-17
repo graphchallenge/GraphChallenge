@@ -93,6 +93,7 @@ if __name__ == "__main__":
             partition, partition_triplet, args.blockReductionRate)
 
         t_nodal_update_end = timeit.default_timer()
+        evaluation.update_timings(t_block_merge_start, t_nodal_update_start, t_nodal_update_end)
 
         if args.verbose:
             print('Overall entropy: {}'.format(partition_triplet.overall_entropy))
@@ -101,6 +102,7 @@ if __name__ == "__main__":
                 print('\nOptimal partition found with {} blocks'.format(partition.num_blocks))
 
     t_end = timeit.default_timer()
+    evaluation.total_runtime(t_start, t_end)
     print('\nGraph partition took {} seconds'.format(t_end - t_start))
 
     # evaluate output partition against the true partition
