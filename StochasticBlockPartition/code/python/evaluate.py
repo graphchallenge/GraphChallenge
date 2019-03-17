@@ -1,6 +1,8 @@
 """Contains code for evaluating the resulting partition.
 """
 
+import os
+import csv
 from typing import Tuple, List, Callable
 from argparse import Namespace
 
@@ -14,6 +16,37 @@ from graph import Graph
 class Evaluation(object):
     """Stores the evaluation results, and saves them to file.
     """
+
+    FIELD_NAMES = [
+        'block size variation',
+        'block overlap',
+        'streaming type',
+        'num vertices',
+        'num edges',
+        'num block proposals',
+        'beta',
+        'sparse',
+        'num blocks in algorithm partition',
+        'num blocks in truth partition',
+        'accuracy',
+        'rand index',
+        'adjusted rand index',
+        'pairwise recall',
+        'pairwise precision',
+        'entropy of algorithm partition',
+        'entropy of truth partition',
+        'entropy of algorithm partition given truth partition',
+        'entropy of truth partition given algorithm partition',
+        'mutual information',
+        'fraction of missed information',
+        'fraction of erroneous information',
+        'num nodal updates',
+        'num nodal update iterations',
+        'num iterations',
+        'total partition time',
+        'total block merge time',
+        'total nodal update time'
+    ]
 
     def __init__(self, args: Namespace, graph: Graph) -> None:
         """Creates a new Evaluation object.
@@ -54,6 +87,7 @@ class Evaluation(object):
         self.erroneous_info = 0.0
         # Algorithm runtime measures
         self.num_nodal_updates = 0
+        self.num_nodal_update_iterations = 0
         self.num_iterations = 0
         self.total_partition_time = 0.0
         self.total_block_merge_time = 0.0
@@ -61,6 +95,52 @@ class Evaluation(object):
         self.block_merge_times = list()  # type: List[int]
         self.nodal_update_times = list()  # type: List[int]
     # End of __init__()
+
+    def save(self):
+        """Saves the evaluation to a CSV file. Creates a new CSV file one the path of csv_file doesn't exist. Appends
+        results to the CSV file if it does.
+        """
+        write_header = False
+        if not os.path.isfile(self.csv_file):
+            directory = os.path.dirname(self.csv_file)
+            if directory not in [".", ""]:
+                os.makedirs(directory)
+            write_header = True
+        with open(self.csv_file, "a") as csv_file:
+            writer = csv.writer(csv_file)
+            if write_header:
+                writer.writerow(Evaluation.FIELD_NAMES)
+            writer.writerow([
+                self.block_size_variation,
+                self.block_overlap,
+                self.streaming_type,
+                self.num_nodes,
+                self.num_edges,
+                self.num_block_proposals,
+                self.beta,
+                self.sparse,
+                self.num_blocks_algorithm,
+                self.num_blocks_truth,
+                self.accuracy,
+                self.rand_index,
+                self.adjusted_rand_index,
+                self.pairwise_recall,
+                self.pairwise_precision,
+                self.entropy_algorithm,
+                self.entropy_truth,
+                self.entropy_algorithm_given_truth,
+                self.entropy_truth_given_algorithm,
+                self.mutual_info,
+                self.missed_info,
+                self.erroneous_info,
+                self.num_nodal_updates,
+                self.num_nodal_update_iterations,
+                self.num_iterations,
+                self.total_partition_time,
+                self.total_nodal_update_time,
+                self.total_block_merge_time
+            ])
+    # End of save()
 # End of Evaluation()
 
 
@@ -88,43 +168,7 @@ def evaluate_partition(true_b: np.ndarray, alg_b: np.ndarray, evaluation: Evalua
     joint_prob = evaluate_accuracy(contingency_table, evaluation)
     evaluate_pairwise_metrics(contingency_table, N, evaluation)
     evaluate_entropy_metrics(joint_prob, evaluation)
-
-    # # compute the information theoretic metrics
-    # marginal_prob_b2 = np.sum(joint_prob, 0)
-    # marginal_prob_b1 = np.sum(joint_prob, 1)
-    # idx1 = np.nonzero(marginal_prob_b1)
-    # idx2 = np.nonzero(marginal_prob_b2)
-    # conditional_prob_b2_b1 = np.zeros(joint_prob.shape)
-    # conditional_prob_b1_b2 = np.zeros(joint_prob.shape)
-    # conditional_prob_b2_b1[idx1, :] = joint_prob[idx1, :] / marginal_prob_b1[idx1, None]
-    # conditional_prob_b1_b2[:, idx2] = joint_prob[:, idx2] / marginal_prob_b2[None, idx2]
-    # # compute entropy of the non-partition2 and the partition2 version
-    # H_b2 = -np.sum(marginal_prob_b2[idx2] * np.log(marginal_prob_b2[idx2]))
-    # H_b1 = -np.sum(marginal_prob_b1[idx1] * np.log(marginal_prob_b1[idx1]))
-
-    # # compute the conditional entropies
-    # idx = np.nonzero(joint_prob)
-    # H_b2_b1 = -np.sum(np.sum(joint_prob[idx] * np.log(conditional_prob_b2_b1[idx])))
-    # H_b1_b2 = -np.sum(np.sum(joint_prob[idx] * np.log(conditional_prob_b1_b2[idx])))
-    # # compute the mutual information (symmetric)
-    # marginal_prod = np.dot(marginal_prob_b1[:, None], np.transpose(marginal_prob_b2[:, None]))
-    # MI_b1_b2 = np.sum(np.sum(joint_prob[idx] * np.log(joint_prob[idx] / marginal_prod[idx])))
-
-    # if H_b1 > 0:
-    #     fraction_missed_info = H_b1_b2 / H_b1
-    # else:
-    #     fraction_missed_info = 0
-    # if H_b2 > 0:
-    #     fraction_err_info = H_b2_b1 / H_b2
-    # else:
-    #     fraction_err_info = 0
-    # print('Entropy of truth partition: {}'.format(abs(H_b1)))
-    # print('Entropy of alg. partition: {}'.format(abs(H_b2)))
-    # print('Conditional entropy of truth partition given alg. partition: {}'.format(abs(H_b1_b2)))
-    # print('Conditional entropy of alg. partition given truth partition: {}'.format(abs(H_b2_b1)))
-    # print('Mutual informationion between truth partition and alg. partition: {}'.format(abs(MI_b1_b2)))
-    # print('Fraction of missed information: {}'.format(abs(fraction_missed_info)))
-    # print('Fraction of erroneous information: {}'.format(abs(fraction_err_info)))
+    evaluation.save()
 # End of evaluate_partition()
 
 
