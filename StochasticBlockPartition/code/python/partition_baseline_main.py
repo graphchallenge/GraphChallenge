@@ -83,7 +83,7 @@ if __name__ == "__main__":
         if args.verbose:
             print("Beginning nodal updates")
 
-        partition = reassign_nodes(partition, graph, partition_triplet, args)
+        partition = reassign_nodes(partition, graph, partition_triplet, evaluation, args)
 
         if visualize_graph:
             graph_object = plot_graph_with_partition(graph.out_neighbors, partition.block_assignment, graph_object)
@@ -94,6 +94,7 @@ if __name__ == "__main__":
 
         t_nodal_update_end = timeit.default_timer()
         evaluation.update_timings(t_block_merge_start, t_nodal_update_start, t_nodal_update_end)
+        evaluation.num_iterations += 1
 
         if args.verbose:
             print('Overall entropy: {}'.format(partition_triplet.overall_entropy))

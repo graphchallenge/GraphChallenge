@@ -17,10 +17,11 @@ from partition_baseline_support import update_partition
 from partition import Partition
 from partition import PartitionTriplet
 from graph import Graph
+from evaluate import Evaluation
 
 
-def reassign_nodes(partition: Partition, graph: Graph, 
-    partition_triplet: PartitionTriplet, args: Namespace) -> Partition:
+def reassign_nodes(partition: Partition, graph: Graph, partition_triplet: PartitionTriplet, evaluation: Evaluation,
+    args: Namespace) -> Partition:
     """Reassigns nodes to different blocks based on Bayesian statistics.
 
         Parameters
@@ -31,6 +32,8 @@ def reassign_nodes(partition: Partition, graph: Graph,
                 the loaded Graph object
         partition_triplet : PartitionTriplet
                 the triplet of partitions with the lowest overall entropy scores so far
+        evaluation : Evaluation
+                stores the evaluation metrics
         args : Namespace
                 the command-line arguments
 
@@ -45,20 +48,20 @@ def reassign_nodes(partition: Partition, graph: Graph,
     delta_entropy_threshold2 = 1e-4  # threshold after the golden ratio bracket is established (typically lower to fine-tune to partition)
     delta_entropy_moving_avg_window = 3  # width of the moving average window for the delta entropy convergence criterion
 
-    total_num_nodal_moves = 0
     itr_delta_entropy = np.zeros(args.iterations)
 
     # compute the global entropy for MCMC convergence criterion
     partition.overall_entropy = compute_overall_entropy(partition, graph.num_nodes, graph.num_edges, args.sparse)
 
     for itr in range(args.iterations):
+        evaluation.num_nodal_update_iterations += 1
         num_nodal_moves = 0
         itr_delta_entropy[itr] = 0
 
         for current_node in range(graph.num_nodes):
             p_accept, delta_entropy = propose_new_assignment(current_node, partition, graph, args)
             if p_accept >= 0.0:
-                total_num_nodal_moves += 1
+                evaluation.num_nodal_updates += 1
                 num_nodal_moves += 1
                 itr_delta_entropy[itr] += delta_entropy
 
@@ -83,7 +86,7 @@ def reassign_nodes(partition: Partition, graph: Graph,
 
     if args.verbose:
         print("Total number of nodal moves: {}, overall_entropy: {:0.2f}".format(
-            total_num_nodal_moves, partition.overall_entropy))
+            evaluation.num_nodal_updates, partition.overall_entropy))
 
     return partition
 # End of reassign_nodes()
