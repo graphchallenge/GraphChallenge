@@ -118,3 +118,8 @@ dmypy.json
 # Custom added
 # VSCode stuff
 *.code-workspace
+**/.vscode
+
+# Data and trial runs
+**/eval
+**/data
