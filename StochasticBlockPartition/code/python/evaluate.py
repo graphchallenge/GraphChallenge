@@ -483,6 +483,9 @@ def evaluate_entropy_metrics(joint_prob: np.ndarray, evaluation: Evaluation):
     else:
         fraction_err_info = 0
 
+    evaluation.missed_info = fraction_missed_info
+    evaluation.erroneous_info = fraction_err_info
+
     print('Fraction of missed information: {}'.format(abs(fraction_missed_info)))
     print('Fraction of erroneous information: {}'.format(abs(fraction_err_info)))
 # End of evaluate_entropy_metrics()
