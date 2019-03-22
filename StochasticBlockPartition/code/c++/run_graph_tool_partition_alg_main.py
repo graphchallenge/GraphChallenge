@@ -9,8 +9,6 @@ parser.add_argument("-p", "--parts", action="store", type=int)
 parser.add_argument("input_filename", action="store", type=str, default="../../data/static/simulated_blockmodel_graph_500_nodes")
 args = parser.parse_args()
 
-print(args.parts)
-
 input_filename = args.input_filename
 
 if not os.path.isfile(input_filename + '.tsv') and not os.path.isfile(input_filename + '_1.tsv'):
@@ -33,7 +31,7 @@ t0 = timeit.default_timer()
 # the nodal updates (smaller value is stricter), and the verbose option prints updates on each step of the algorithm.
 # Please refer to the graph-tool documentation under graph-tool.inference for details on the input parameters
 graph_tool_partition = gt.minimize_blockmodel_dl(input_graph, mcmc_args={'parallel':True},
-                                                 mcmc_equilibrate_args={'verbose':False, 'epsilon':1e-5}, verbose=True)
+                                                 mcmc_equilibrate_args={'verbose':False, 'epsilon':1e-6}, verbose=True)
 t1 = timeit.default_timer()
 print('\nGraph partition took {} seconds'.format(t1-t0))
 evaluate_partition(true_partition, graph_tool_partition.get_blocks().a)
