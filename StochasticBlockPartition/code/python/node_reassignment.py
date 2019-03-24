@@ -3,6 +3,7 @@
 
 from argparse import Namespace
 from typing import List, Tuple
+import math
 
 import numpy as np
 
@@ -43,12 +44,13 @@ def reassign_nodes(partition: Partition, graph: Graph, partition_triplet: Partit
                 the updated partitioning results
     """
     # nodal partition updates parameters
-    delta_entropy_threshold1 = 5e-4  # stop iterating when the change in entropy falls below this fraction of the overall entropy
+    # delta_entropy_threshold1 = 5e-4  # stop iterating when the change in entropy falls below this fraction of the overall entropy
                                     # lowering this threshold results in more nodal update iterations and likely better performance, but longer runtime
-    delta_entropy_threshold2 = 1e-4  # threshold after the golden ratio bracket is established (typically lower to fine-tune to partition)
+    # delta_entropy_threshold2 = 1e-4  # threshold after the golden ratio bracket is established (typically lower to fine-tune to partition)
     delta_entropy_moving_avg_window = 3  # width of the moving average window for the delta entropy convergence criterion
 
     itr_delta_entropy = np.zeros(args.iterations)
+    delta_entropy_threshold1, delta_entropy_threshold2 = get_thresholds(evaluation.num_iterations, args)
 
     # compute the global entropy for MCMC convergence criterion
     partition.overall_entropy = compute_overall_entropy(partition, graph.num_nodes, graph.num_edges, args.sparse)
@@ -165,3 +167,65 @@ def propose_new_assignment(current_node: int, partition: Partition, graph: Graph
     else:
         return -1.0, -1.0
 # End of reassign_node()
+
+
+def get_thresholds(current_iteration: int, args: Namespace) -> Tuple[float, float]:
+    """Returns the thresholds at which to stop the nodal update reassignment iterations. The type of calculation is
+    dependent on the nodal update strategy and direction arguments.
+
+    If direction is growth:
+        the threshold will increase with every algorithm iteration, leading to less nodal updates being performed over
+        time
+    If decay:
+        the threshold will decrease with every algorithm iteration, leading to more nodal updates being performed over
+        time
+
+    If nodal update strategy is original:
+        return (original threshold, 0.0001). This is the only case where the two thresholds are different
+    If step:
+        the original threshold will increase or decrease by the value of (factor * current_iteration)
+    If exponential:
+        the original threshold will increase or decrease by a factor of (factor ^ current_iteration)
+    if log:
+        the original threshold will increase or decrease by a factor of ln(current_iteration + 3). This is because 
+        ln(3) is the first natural logarithm of a whole number that's a whole number
+
+
+        Parameters
+        ---------
+        current_iteration : int
+                the current iteration
+        args : Namespace
+                the command-line arguments given
+
+        Returns
+        ------
+        threshold1 : float
+                the threshold to use until the golden ratio bracket is established
+        threshold2 : float
+                the threshold ot use after the golden ratio bracket is established
+    """
+    if args.nodal_update_strategy == "original":
+        return args.threshold, 1e-4
+    elif args.nodal_update_strategy == "step":
+        if args.direction == "growth":
+            new_threshold = args.threshold + (current_iteration * args.factor)
+        else:  # direction == "decay"
+            new_threshold = max(args.threshold - (current_iteration * args.factor), 1e-8)
+        return new_threshold, new_threshold
+    elif args.nodal_update_strategy == "exponential":
+        if args.direction == "growth":
+            factor = 1 + args.factor
+        else:
+            factor = 1 - args.factor
+        new_threshold = args.threshold * math.pow(factor, current_iteration)
+        return new_threshold, new_threshold
+    elif args.nodal_update_strategy == "log":
+        if args.direction == "growth":
+            new_threshold = math.log(current_iteration + 3) * args.threshold
+        else:  # direction == "decay"
+            new_threshold = args.threshold / math.log(current_iteration + 3)
+        return new_threshold, new_threshold
+    else:
+        raise NotImplementedError("The nodal update strategy {} is not implemented.".format(args.nodal_update_strategy))
+# End of get_thresholds()
