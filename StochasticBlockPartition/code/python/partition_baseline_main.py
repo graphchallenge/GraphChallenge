@@ -35,6 +35,18 @@ def parse_arguments():
     parser.add_argument("--beta", type=int, default=3, help="exploitation vs exploration: higher threshold = higher exploration. Default = 3")
     parser.add_argument("--sparse", action="store_true", help="If supplied, will use Scipy's sparse matrix representation for the matrices.")
     parser.add_argument("-c", "--csv", type=str, default="eval/benchmark.csv", help="The filepath to the csv file in which to store the evaluation results.")
+    # Nodal Update Strategy
+    parser.add_argument("-u", "--nodal_update_strategy", type=str, default="original", help="(original|step|exponential|log). Default = original")
+    parser.add_argument("--direction", type=str, default="growth", help="(growth|decay) Default = growth")
+    parser.add_argument("-f", "--factor", type=float, default=0.0001, help="""The factor by which to grow or decay the nodal update threshold. 
+                                                                            If the nodal update strategy is step:
+                                                                                this value is added to or subtracted from the threshold with every iteration
+                                                                            If the nodal update strategy is exponential:
+                                                                                this (1 +/- this value) is multiplied by the threshold with every iteration
+                                                                            If the nodal update strategy is log:
+                                                                                this value is ignored
+                                                                            Default = 0.0001""")
+    parser.add_argument("-e", "--threshold", type=float, default=5e-4, help="The threshold at which to stop nodal block reassignment. Default = 5e-4")
     args = parser.parse_args()
     return args
 # End of parse_arguments()
