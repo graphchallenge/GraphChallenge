@@ -26,6 +26,10 @@ class Evaluation(object):
         'num block proposals',
         'beta',
         'sparse',
+        'delta entropy threshold',
+        'nodal update threshold strategy',
+        'nodal update threshold factor',
+        'nodal update threshold direction',
         'num blocks in algorithm partition',
         'num blocks in truth partition',
         'accuracy',
@@ -70,6 +74,10 @@ class Evaluation(object):
         self.num_block_proposals = args.blockProposals
         self.beta = args.beta
         self.sparse = args.sparse
+        self.delta_entropy_threshold = args.threshold
+        self.nodal_update_threshold_strategy = args.nodal_update_strategy
+        self.nodal_update_threshold_factor = args.factor
+        self.nodal_update_threshold_direction = args.direction
         # Goodness of partition measures
         self.num_blocks_algorithm = 0
         self.num_blocks_truth = 0
@@ -149,6 +157,10 @@ class Evaluation(object):
                 self.num_block_proposals,
                 self.beta,
                 self.sparse,
+                self.delta_entropy_threshold,
+                self.nodal_update_threshold_strategy,
+                self.nodal_update_threshold_factor,
+                self.nodal_update_threshold_direction,
                 self.num_blocks_algorithm,
                 self.num_blocks_truth,
                 self.accuracy,
