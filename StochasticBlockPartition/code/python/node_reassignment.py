@@ -183,7 +183,7 @@ def get_thresholds(current_iteration: int, args: Namespace) -> Tuple[float, floa
     If nodal update strategy is original:
         return (original threshold, 0.0001). This is the only case where the two thresholds are different
     If step:
-        the original threshold will increase or decrease by the value of (factor * current_iteration)
+        the original threshold will increase or decrease by the value of (threshold * factor * current_iteration)
     If exponential:
         the original threshold will increase or decrease by a factor of (factor ^ current_iteration)
     if log:
@@ -209,9 +209,9 @@ def get_thresholds(current_iteration: int, args: Namespace) -> Tuple[float, floa
         return args.threshold, 1e-4
     elif args.nodal_update_strategy == "step":
         if args.direction == "growth":
-            new_threshold = args.threshold + (current_iteration * args.factor)
+            new_threshold = args.threshold + (args.threshold * current_iteration * args.factor)
         else:  # direction == "decay"
-            new_threshold = max(args.threshold - (current_iteration * args.factor), 1e-8)
+            new_threshold = max(args.threshold - (args.threshold * current_iteration * args.factor), 1e-8)
         return new_threshold, new_threshold
     elif args.nodal_update_strategy == "exponential":
         if args.direction == "growth":
