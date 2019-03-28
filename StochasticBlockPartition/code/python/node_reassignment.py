@@ -61,8 +61,8 @@ def reassign_nodes(partition: Partition, graph: Graph, partition_triplet: Partit
         itr_delta_entropy[itr] = 0
 
         for current_node in range(graph.num_nodes):
-            p_accept, delta_entropy = propose_new_assignment(current_node, partition, graph, args)
-            if p_accept >= 0.0:
+            delta_entropy, did_move = propose_new_assignment(current_node, partition, graph, args)
+            if did_move:
                 evaluation.num_nodal_updates += 1
                 num_nodal_moves += 1
                 itr_delta_entropy[itr] += delta_entropy
@@ -73,7 +73,7 @@ def reassign_nodes(partition: Partition, graph: Graph, partition_triplet: Partit
                 itr, num_nodal_moves, itr_delta_entropy[itr] / float(partition.overall_entropy)))
 
         # exit MCMC if the recent change in entropy falls below a small fraction of the overall entropy
-        if itr >= (delta_entropy_moving_avg_window - 1):  
+        if itr >= (delta_entropy_moving_avg_window - 1):
             if not (np.all(np.isfinite(partition_triplet.overall_entropy))):  # golden ratio bracket not yet established
                 if (-np.mean(itr_delta_entropy[(itr - delta_entropy_moving_avg_window + 1):itr]) < (
                     delta_entropy_threshold1 * partition.overall_entropy)):
@@ -95,7 +95,7 @@ def reassign_nodes(partition: Partition, graph: Graph, partition_triplet: Partit
 
 
 def propose_new_assignment(current_node: int, partition: Partition, graph: Graph, 
-    args: Namespace) -> Tuple[float, float]:
+    args: Namespace) -> Tuple[float, bool]:
     """Proposes a block reassignment to for the given node.
 
         Parameters
@@ -117,6 +117,8 @@ def propose_new_assignment(current_node: int, partition: Partition, graph: Graph
         delta_entropy : float
                 the change in entropy due to the node's block reassignment (if any). If the block isn't reassigned,
                 returns -1.0
+        did_move : bool
+                True if the node was moved to a new block, False otherwise
     """
     current_block = partition.block_assignment[current_node]
     out_neighbors = graph.out_neighbors[current_node]
@@ -124,6 +126,8 @@ def propose_new_assignment(current_node: int, partition: Partition, graph: Graph
     # propose a new block for this node
     proposal, num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges = propose_new_partition(
         current_block, out_neighbors, in_neighbors, partition.block_assignment, partition, False, args.sparse)
+
+    did_move = False  # Has the graph node been moved to another block or not?
 
     # determine whether to accept or reject the proposal
     if (proposal != current_block):
@@ -163,9 +167,10 @@ def propose_new_assignment(current_node: int, partition: Partition, graph: Graph
             partition = update_partition(partition, current_node, current_block, proposal, edge_count_updates,
                                             block_degrees_out_new, block_degrees_in_new, block_degrees_new, 
                                             args.sparse)
-        return p_accept, delta_entropy
+            did_move = True
+        return delta_entropy, did_move
     else:
-        return -1.0, -1.0
+        return -1.0, did_move
 # End of reassign_node()
 
 
