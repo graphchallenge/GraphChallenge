@@ -201,9 +201,9 @@ class MCMCTimings(object):
             superstep : int
                 the superstep of the algorithm for which MCMC timings are being collected
         """
+        self.superstep = superstep
         self._start_t = 0.0
         self._start_b = False
-        self.superstep = superstep
         self.initialization = 0.0
         self.compute_initial_entropy = 0.0
         self.iterations = 0
@@ -359,16 +359,16 @@ class BlockMergeTimings(object):
             superstep : int
                 the superstep of the algorithm for which block merge timings are being collected
         """
+        self.superstep = superstep
         self._start_t = 0.0
         self._start_b = False
         self.initialization = 0.0
-        self.iterations = 0
-        self.indexing = list()  # type: List[float]
-        self.proposal = list()  # type: List[float]
-        self.edge_count_updates = list()  # type: List[float]
-        self.block_degree_updates = list()  # type: List[float]
-        self.compute_delta_entropy = list()  # type: List[float]
-        self.acceptance = list()  # type: List[float]
+        self.indexing = 0.0
+        self.proposal = 0.0
+        self.edge_count_updates = 0.0
+        self.block_degree_updates = 0.0
+        self.compute_delta_entropy = 0.0
+        self.acceptance = 0.0
         self.merging = 0.0
         self.re_counting_edges = 0.0
     # End of __init__()
@@ -400,61 +400,42 @@ class BlockMergeTimings(object):
         """Stores the time taken to do indexing for the current iteration.
         """
         if not self._start():
-            if len(self.indexing) == self.iterations:
-                self.indexing.append(timeit.default_timer() - self._start_t)
-            else:
-                self.indexing[self.iterations] += timeit.default_timer() - self._start_t
+            self.indexing += timeit.default_timer() - self._start_t
     # End of t_indexing()
 
     def t_proposal(self):
         """Stores the time taken to propose a new block merge for the current iteration.
         """
         if not self._start():
-            if len(self.proposal) == self.iterations:
-                self.proposal.append(timeit.default_timer() - self._start_t)
-            else:
-                self.proposal[self.iterations] += timeit.default_timer() - self._start_t
+            self.proposal += timeit.default_timer() - self._start_t
     # End of t_proposal()
 
     def t_edge_count_updates(self):
         """Stores the time taken to calculate the edge count updates for the current iteration.
         """
         if not self._start():
-            if len(self.edge_count_updates) == self.iterations:
-                self.edge_count_updates.append(timeit.default_timer() - self._start_t)
-            else:
-                self.edge_count_updates[self.iterations] += timeit.default_timer() - self._start_t
+            self.edge_count_updates += timeit.default_timer() - self._start_t
     # End of t_edge_count_updates()
 
     def t_block_degree_updates(self):
         """Stores the time taken to calculate the block degree updates for the current iteration.
         """
         if not self._start():
-            if len(self.block_degree_updates) == self.iterations:
-                self.block_degree_updates.append(timeit.default_timer() - self._start_t)
-            else:
-                self.block_degree_updates[self.iterations] += timeit.default_timer() - self._start_t
+            self.block_degree_updates += timeit.default_timer() - self._start_t
     # End of t_block_degree_updates()
 
     def t_compute_delta_entropy(self):
         """Stores the time taken to calculate the change in entropy for the current iteration.
         """
         if not self._start():
-            if len(self.compute_delta_entropy) == self.iterations:
-                self.compute_delta_entropy.append(timeit.default_timer() - self._start_t)
-            else:
-                self.compute_delta_entropy[self.iterations] += timeit.default_timer() - self._start_t
+            self.compute_delta_entropy += timeit.default_timer() - self._start_t
     # End of t_compute_delta_entropy()
 
     def t_acceptance(self):
         """Stores the time taken to accept or reject new block merge proposals for the current iteration.
         """
         if not self._start():
-            if len(self.acceptance) == self.iterations:
-                self.acceptance.append(timeit.default_timer() - self._start_t)
-            else:
-                self.acceptance[self.iterations] += timeit.default_timer() - self._start_t
-                self.iterations += 1
+            self.acceptance += timeit.default_timer() - self._start_t
     # End of t_acceptance()
 
     def t_merging(self):
