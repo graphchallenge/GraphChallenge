@@ -50,7 +50,16 @@ class Evaluation(object):
         'num iterations',
         'total partition time',
         'total block merge time',
-        'total nodal update time'
+        'total nodal update time',
+        'prepare the next iteration'
+    ]
+
+    DETAILS_FIELD_NAMES = [
+        'superstep',
+        'step',
+        'iteration',
+        'substep',
+        'time'
     ]
 
     def __init__(self, args: Namespace, graph: Graph) -> None:
@@ -59,12 +68,13 @@ class Evaluation(object):
             Parameters
             ----------
             args : Namespace
-                    the command-line arguments
+                the command-line arguments
             graph : Graph
-                    the loaded graph to be partitioned
+                the loaded graph to be partitioned
         """
         # CSV file into which to write the results
-        self.csv_file = args.csv
+        self.csv_file = args.csv + ".csv"
+        self.csv_details_file = args.csv + "_details.csv"
         # Dataset parameters
         self.block_size_variation = args.blockSizeVar
         self.block_overlap = args.overlap
@@ -102,26 +112,33 @@ class Evaluation(object):
         self.total_block_merge_time = 0.0
         self.total_nodal_update_time = 0.0
         self.prepare_next_partition = 0.0
+        self.prepare_next_partitions = list()  # type: List[float]
         self.mcmc_details = list()  # type: List[MCMCTimings]
         self.block_merge_details = list()  # type: List[BlockMergeTimings]
     # End of __init__()
 
-    def update_timings(self, block_merge_start_t: float, node_update_start_t: float, node_update_end_t: float):
+    def update_timings(self, block_merge_start_t: float, node_update_start_t: float, prepare_next_start_t: float,
+        prepare_next_end_t: float):
         """Updates the timings of a single iteration (block merge + nodal updates)
 
             Parameters
             ---------
             block_merge_start_t : float
-                    the start time of the block merge step
+                the start time of the block merge step
             node_update_start_t : float
-                    the start time of the nodal update step
-            node_update_end_t : float
-                    the end time of the nodal update step
+                the start time of the nodal update step
+            prepare_next_start_t : float
+                the start time for preparing for the next partitioning iteration
+            prepare_next_end_t : float
+                the end time for preparing for the next partitioning iterations
         """
         block_merge_t = node_update_start_t - block_merge_start_t
-        node_update_t = node_update_end_t - node_update_start_t
+        node_update_t = prepare_next_start_t - node_update_start_t
+        prepare_next_t = prepare_next_end_t - prepare_next_start_t
         self.total_block_merge_time += block_merge_t
         self.total_nodal_update_time += node_update_t
+        self.prepare_next_partition += prepare_next_t
+        self.prepare_next_partitions.append(prepare_next_t)
     # End of update_timings()
 
     def total_runtime(self, start_t: float, end_t: float):
@@ -130,9 +147,9 @@ class Evaluation(object):
             Parameters
             ---------
             start_t : float
-                    the start time of the partitioning
+                the start time of the partitioning
             end_t : float
-                    the end time of the partitioning
+                the end time of the partitioning
         """
         runtime = end_t - start_t
         self.total_partition_time = runtime
@@ -151,7 +168,7 @@ class Evaluation(object):
         with open(self.csv_file, "a") as csv_file:
             writer = csv.writer(csv_file)
             if write_header:
-                writer.writerow(Evaluation.FIELD_NAMES)
+                writer.writerow(Evaluation.DETAILS_FIELD_NAMES)
             writer.writerow([
                 self.block_size_variation,
                 self.block_overlap,
@@ -184,15 +201,36 @@ class Evaluation(object):
                 self.num_iterations,
                 self.total_partition_time,
                 self.total_nodal_update_time,
-                self.total_block_merge_time
+                self.total_block_merge_time,
+                self.prepare_next_partition
             ])
     # End of save()
+
+    def _save_details(self):
+        """Saves the details of the MCMC and Block Merge timings.
+        """
+        write_header = False
+        if not os.path.isfile(self.csv_details_file):
+            directory = os.path.dirname(self.csv_details_file)
+            if directory not in [".", ""]:
+                os.makedirs(directory, exist_ok=True)
+            write_header = True
+        with open(self.csv_details_file, "a") as details_file:
+            writer = csv.writer(details_file)
+            if write_header:
+                writer.writerow(Evaluation.DETAILS_FIELD_NAMES)
+            for i in range(len(self.mcmc_details)):
+                self.mcmc_details[i].save()
+                self.block_merge_details[i].save()
+                writer.writerow([i, "Preparing for Next Iteration", -1, "-", self.prepare_next_partitions[i]])
+    # End of _save_details()
 # End of Evaluation()
 
 
 class MCMCTimings(object):
     """Stores timings for a single iteration of the MCMC update step.
     """
+
     def __init__(self, superstep: int) -> None:
         """Creates an MCMCTimings object.
 
@@ -345,6 +383,46 @@ class MCMCTimings(object):
         if not self._start():
             self.compute_entropy += timeit.default_timer() - self._start_t
     # End of t_compute_initial_entropy()
+
+    def save(self, writer: 'csv._writer'):
+        """Save the MCMC update timing details.
+
+            Parameters
+            ----------
+            writer : csv._writer
+                the CSV writer pointing towards the CSV details file
+        """
+        self._writerow(writer, "Initialization", self.initialization)
+        self._writerow(writer, "Compute Initial Entropy", self.compute_initial_entropy)
+        for i in range(self.iterations):
+            self._writerow(writer, "Indexing", self.indexing[i], i)
+            self._writerow(writer, "Proposal", self.proposal[i], i)
+            self._writerow(writer, "Neighbor Counting", self.neighbor_counting[i], i)
+            self._writerow(writer, "Edge Count Updates", self.edge_count_updates[i], i)
+            self._writerow(writer, "Block Degree Updates", self.block_degree_updates[i], i)
+            self._writerow(writer, "Hastings Correction", self.hastings_correction[i], i)
+            self._writerow(writer, "Compute Delta Entropy", self.compute_delta_entropy[i], i)
+            self._writerow(writer, "Acceptance", self.acceptance[i], i)
+            self._writerow(writer, "Early Stopping", self.early_stopping[i], i)
+        self._writerow(writer, "Compute Final Entropy", self.compute_entropy)
+    # End of save()
+
+    def _writerow(self, writer: 'csv._writer', substep: str, time: float, iteration: int = -1):
+        """Writes the timing information to the current csv writer.
+
+            Parameters
+            ----------
+            writer : csv._writer
+                the current CSV writer object
+            substep : str
+                the name of the substep for which the timing is recorded
+            time : float
+                the timing information to save
+            iteration : int (default = -1)
+                the current iteration
+        """
+        writer.writerow([self.superstep, "MCMC Updates", iteration, substep, time])
+    # End of _writerow()
 # End of MCMCTimings()
 
 
@@ -451,6 +529,42 @@ class BlockMergeTimings(object):
         if not self._start():
             self.re_counting_edges += timeit.default_timer() - self._start_t
     # End of t_re_counting_edges()
+
+    def save(self, writer: 'csv._writer'):
+        """Save the MCMC update timing details.
+
+            Parameters
+            ---------
+            writer : csv._writer
+                the CSV writer pointing towards the CSV details file
+        """
+        self._writerow(writer, "Initialization", self.initialization)
+        self._writerow(writer, "Indexing", self.indexing)
+        self._writerow(writer, "Proposal", self.proposal)
+        self._writerow(writer, "Edge Count Updates", self.edge_count_updates)
+        self._writerow(writer, "Block Degree Updates", self.block_degree_updates)
+        self._writerow(writer, "Compute Delta Entropy", self.compute_delta_entropy)
+        self._writerow(writer, "Acceptance", self.acceptance)
+        self._writerow(writer, "Merging", self.merging)
+        self._writerow(writer, "Re-counting Edges", self.re_counting_edges)
+    # End of save()
+
+    def _writerow(self, writer: 'csv._writer', substep: str, time: float, iteration: int = -1):
+        """Writes the timing information to the current csv writer.
+
+            Parameters
+            ----------
+            writer : csv._writer
+                the current CSV writer object
+            substep : str
+                the name of the substep for which the timing is recorded
+            time : float
+                the timing information to save
+            iteration : int (default = -1)
+                the current iteration
+        """
+        writer.writerow([self.superstep, "Block Merge", iteration, substep, time])
+    # End of _writerow()
 # End of BlockMergeTimings()
 
 
@@ -618,8 +732,7 @@ def evaluate_accuracy(contingency_table: np.ndarray, evaluation: Evaluation) -> 
         joint_prob : np.ndarray (float)
                 the normalized contingency table
     """
-    joint_prob = contingency_table / sum(
-        sum(contingency_table))  # joint probability of the two partitions is just the normalized contingency table
+    joint_prob = contingency_table / sum(sum(contingency_table))  # joint probability of the two partitions is just the normalized contingency table
     accuracy = sum(joint_prob.diagonal())
     print('Accuracy (with optimal partition matching): {}'.format(accuracy))
     print()
