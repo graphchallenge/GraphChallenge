@@ -224,6 +224,32 @@ class Evaluation(object):
                 self.block_merge_details[i].save()
                 writer.writerow([i, "Preparing for Next Iteration", -1, "-", self.prepare_next_partitions[i]])
     # End of _save_details()
+
+    def add_mcmc_timings(self) -> "MCMCTimings":
+        """Adds an empty MCMCTimings object to self.mcmc_details
+
+            Returns
+            -------
+            mcmc_timings : MCMCTimings
+                the empty MCMCTimings object
+        """
+        mcmc_timings = MCMCTimings(len(self.mcmc_details))
+        self.mcmc_details.append(mcmc_timings)
+        return mcmc_timings
+    # End of add_mcmc_timings()
+
+    def add_block_merge_timings(self) -> "BlockMergeTimings":
+        """Adds an empty BlockMergeTimings object to self.block_merge_details
+
+            Returns
+            -------
+            block_merge_timings : BlockMergeTimings
+                the empty BlockMergeTimings object
+        """
+        block_merge_timings = BlockMergeTimings(len(self.block_merge_details))
+        self.block_merge_details.append(block_merge_timings)
+        return block_merge_timings
+    # End of add_block_merge_timings()
 # End of Evaluation()
 
 
@@ -375,6 +401,7 @@ class MCMCTimings(object):
                 self.early_stopping.append(timeit.default_timer() - self._start_t)
             else:
                 self.early_stopping[self.iterations] += timeit.default_timer() - self._start_t
+            self.iterations += 1
     # End of t_early_stopping()
 
     def t_compute_final_entropy(self):
@@ -423,6 +450,18 @@ class MCMCTimings(object):
         """
         writer.writerow([self.superstep, "MCMC Updates", iteration, substep, time])
     # End of _writerow()
+
+    def zeros(self):
+        """Adds zeros to all iteration-dependent variables after the proposal, for the case where the proposal is
+        the same as the current block.
+        """
+        self.neighbor_counting.append(0.0)
+        self.edge_count_updates.append(0.0)
+        self.block_degree_updates.append(0.0)
+        self.hastings_correction.append(0.0)
+        self.compute_delta_entropy.append(0.0)
+        self.acceptance.append(0.0)
+    # End of zeros()
 # End of MCMCTimings()
 
 
