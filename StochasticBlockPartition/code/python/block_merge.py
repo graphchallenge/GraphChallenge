@@ -12,7 +12,8 @@ from partition_baseline_support import compute_delta_entropy
 from partition_baseline_support import carry_out_best_merges
 
 from partition import Partition
-from evaluate import Evaluation, BlockMergeTimings
+from evaluate import Evaluation
+from block_merge_timings import BlockMergeTimings
 
 
 def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_sparse_matrix: bool,
