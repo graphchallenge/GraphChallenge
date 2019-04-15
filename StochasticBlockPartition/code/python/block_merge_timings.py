@@ -37,7 +37,7 @@ class BlockMergeTimings(object):
             _start_b : bool
                 True if time recorded was for the start of a step, False if it was recorded for the end of a step
         """
-        if self._start_b:
+        if not self._start_b:
             self._start_t = timeit.default_timer()
             self._start_b = True
         else:
