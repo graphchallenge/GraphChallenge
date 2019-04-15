@@ -100,12 +100,14 @@ if __name__ == "__main__":
         if visualize_graph:
             graph_object = plot_graph_with_partition(graph.out_neighbors, partition.block_assignment, graph_object)
 
+        t_prepare_next_start = timeit.default_timer()
+
         # check whether the partition with optimal number of block has been found; if not, determine and prepare for the next number of blocks to try
         partition, partition_triplet = prepare_for_partition_on_next_num_blocks(
             partition, partition_triplet, args.blockReductionRate)
 
-        t_nodal_update_end = timeit.default_timer()
-        evaluation.update_timings(t_block_merge_start, t_nodal_update_start, t_nodal_update_end)
+        t_prepare_next_end = timeit.default_timer()
+        evaluation.update_timings(t_block_merge_start, t_nodal_update_start, t_prepare_next_start, t_prepare_next_end)
         evaluation.num_iterations += 1
 
         if args.verbose:
