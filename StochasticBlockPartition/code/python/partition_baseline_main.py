@@ -34,7 +34,7 @@ def parse_arguments():
     parser.add_argument("-r", "--blockReductionRate", type=float, default=0.5, help="The block reduction rate. Default = 0.5")
     parser.add_argument("--beta", type=int, default=3, help="exploitation vs exploration: higher threshold = higher exploration. Default = 3")
     parser.add_argument("--sparse", action="store_true", help="If supplied, will use Scipy's sparse matrix representation for the matrices.")
-    parser.add_argument("-c", "--csv", type=str, default="eval/benchmark.csv", help="The filepath to the csv file in which to store the evaluation results.")
+    parser.add_argument("-c", "--csv", type=str, default="eval/benchmark", help="The filepath to the csv file in which to store the evaluation results.")
     # Nodal Update Strategy
     parser.add_argument("-u", "--nodal_update_strategy", type=str, default="original", help="(original|step|exponential|log). Default = original")
     parser.add_argument("--direction", type=str, default="growth", help="(growth|decay) Default = growth")
