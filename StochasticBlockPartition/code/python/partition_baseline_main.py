@@ -85,7 +85,7 @@ if __name__ == "__main__":
         if args.verbose:
             print("\nMerging down blocks from {} to {}".format(partition.num_blocks, partition.num_blocks - partition.num_blocks_to_merge))
         
-        partition = merge_blocks(partition, args.blockProposals, args.sparse, graph.out_neighbors)
+        partition = merge_blocks(partition, args.blockProposals, args.sparse, graph.out_neighbors, evaluation)
 
         t_nodal_update_start = timeit.default_timer()
 
