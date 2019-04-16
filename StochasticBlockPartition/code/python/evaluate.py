@@ -206,6 +206,7 @@ class Evaluation(object):
                 self.total_block_merge_time,
                 self.prepare_next_partition
             ])
+        self._save_details()
     # End of save()
 
     def _save_details(self):
@@ -222,8 +223,8 @@ class Evaluation(object):
             if write_header:
                 writer.writerow(Evaluation.DETAILS_FIELD_NAMES)
             for i in range(len(self.mcmc_details)):
-                self.mcmc_details[i].save()
-                self.block_merge_details[i].save()
+                self.mcmc_details[i].save(writer)
+                self.block_merge_details[i].save(writer)
                 writer.writerow([i, "Preparing for Next Iteration", -1, "-", self.prepare_next_partitions[i]])
     # End of _save_details()
 
