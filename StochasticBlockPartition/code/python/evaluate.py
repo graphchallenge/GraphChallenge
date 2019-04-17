@@ -51,8 +51,8 @@ class Evaluation(object):
         'num nodal update iterations',
         'num iterations',
         'total partition time',
-        'total block merge time',
         'total nodal update time',
+        'total block merge time',
         'prepare the next iteration'
     ]
 
@@ -170,7 +170,7 @@ class Evaluation(object):
         with open(self.csv_file, "a") as csv_file:
             writer = csv.writer(csv_file)
             if write_header:
-                writer.writerow(Evaluation.DETAILS_FIELD_NAMES)
+                writer.writerow(Evaluation.FIELD_NAMES)
             writer.writerow([
                 self.block_size_variation,
                 self.block_overlap,
