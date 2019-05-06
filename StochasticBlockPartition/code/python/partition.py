@@ -29,7 +29,7 @@ class Partition():
         self.num_blocks = num_blocks
         self.block_assignment = np.array(range(num_blocks))
         self.overall_entropy = np.inf
-        self.interblock_edge_count = np.zeros((num_blocks, num_blocks))
+        self.interblock_edge_count = [[]]  # type: np.array
         self.block_degrees = np.zeros(num_blocks)
         self.block_degrees_out = np.zeros(num_blocks)
         self.block_degrees_in = np.zeros(num_blocks)
