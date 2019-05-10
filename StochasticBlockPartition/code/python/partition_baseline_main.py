@@ -47,6 +47,7 @@ def parse_arguments():
                                                                                 this value is ignored
                                                                             Default = 0.0001""")
     parser.add_argument("-e", "--threshold", type=float, default=5e-4, help="The threshold at which to stop nodal block reassignment. Default = 5e-4")
+    parser.add_argument("-z", "--sample_size", type=int, default=100, help="The percent of total nodes to use as sample. Default = 100 (no sampling)")
     args = parser.parse_args()
     return args
 # End of parse_arguments()
@@ -58,7 +59,8 @@ if __name__ == "__main__":
     true_partition_available = True
     visualize_graph = False  # whether to plot the graph layout colored with intermediate partitions
 
-    graph = Graph.load(args)
+    full_graph = Graph.load(args)
+    graph, mapping = full_graph.sample(args)
 
     if args.verbose:
         print('Number of nodes: {}'.format(graph.num_nodes))

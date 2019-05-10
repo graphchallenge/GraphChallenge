@@ -28,6 +28,7 @@ class Evaluation(object):
         'num edges',
         'num block proposals',
         'beta',
+        'sample size (%)',
         'sparse',
         'delta entropy threshold',
         'nodal update threshold strategy',
@@ -86,6 +87,7 @@ class Evaluation(object):
         # Algorithm parameters
         self.num_block_proposals = args.blockProposals
         self.beta = args.beta
+        self.sample_size = args.sample_size
         self.sparse = args.sparse
         self.delta_entropy_threshold = args.threshold
         self.nodal_update_threshold_strategy = args.nodal_update_strategy
@@ -179,6 +181,7 @@ class Evaluation(object):
                 self.num_edges,
                 self.num_block_proposals,
                 self.beta,
+                self.sample_size,
                 self.sparse,
                 self.delta_entropy_threshold,
                 self.nodal_update_threshold_strategy,

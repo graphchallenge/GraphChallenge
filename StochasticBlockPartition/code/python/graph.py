@@ -3,7 +3,7 @@
 
 import os
 import sys
-from typing import List, Optional
+from typing import List, Optional, Tuple, Dict
 import argparse
 
 import numpy as np
@@ -77,6 +77,47 @@ class Graph():
             graph = _load_graph(input_filename, load_true_partition=True)
         return graph
     # End of load()
+
+    def sample(self, args: argparse.Namespace) -> Tuple['Graph', Dict[int,int]]:
+        """Sample a set of vertices from the graph.
+
+            Parameters
+            ----------
+            args : Namespace
+                    the parsed command-line arguments
+            
+            Returns
+            ------
+            graph : Graph
+                    the sampled Graph object
+        """
+        sample_num = int(self.num_nodes * (args.sample_size / 100))
+        print("Sampling {} vertices from graph".format(sample_num))
+        sample_idx = np.random.choice(self.num_nodes, sample_num, replace=False)
+        mapping = dict([(v, k) for k,v in enumerate(sample_idx)])
+        new_out_neighbors = list()  # type: List[np.ndarray]
+        new_in_neighbors = list()  # type: List[np.ndarray]
+        num_edges = 0
+        for index in sample_idx:
+            out_neighbors = self.out_neighbors[index]
+            out_mask = np.isin(out_neighbors[:,0], sample_idx, assume_unique=False)
+            sampled_out_neighbors = out_neighbors[out_mask]
+            for out_neighbor in sampled_out_neighbors:
+                out_neighbor[0] = mapping[out_neighbor[0]]
+            new_out_neighbors.append(sampled_out_neighbors)
+            in_neighbors = self.in_neighbors[index]
+            in_mask = np.isin(in_neighbors[:,0], sample_idx, assume_unique=False)
+            sampled_in_neighbors = in_neighbors[in_mask]
+            for in_neighbor in sampled_in_neighbors:
+                in_neighbor[0] = mapping[in_neighbor[0]]
+            new_in_neighbors.append(sampled_in_neighbors)
+            num_edges += np.sum(out_mask) + np.sum(in_mask)
+        true_block_assignment = self.true_block_assignment[sample_idx]
+        true_blocks = list(set(true_block_assignment))
+        true_blocks_mapping = dict([(v, k) for k,v in enumerate(true_blocks)])
+        true_block_assignment = [true_blocks_mapping[b] for b in true_block_assignment]
+        return Graph(new_out_neighbors, new_in_neighbors, sample_num, num_edges, true_block_assignment), mapping
+    # End of sample()
 # End of Graph()
 
 
