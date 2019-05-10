@@ -100,7 +100,7 @@ class PartitionTriplet():
         # overall entropy for the high, best, and low number of blocks so far
         self.overall_entropy = [np.Inf, np.Inf, np.Inf]  # type: List[float]
         # number of blocks for the high, best, and low number of blocks so far
-        self.num_blocks = [[], [], []]  # type: List[int]
+        self.num_blocks = [0, 0, 0]  # type: List[int]
         self.optimal_num_blocks_found = False
     
     def update(self, partition: Partition):
