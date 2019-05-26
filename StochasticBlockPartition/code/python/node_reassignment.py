@@ -264,3 +264,36 @@ def get_thresholds(current_iteration: int, args: Namespace) -> Tuple[float, floa
     else:
         raise NotImplementedError("The nodal update strategy {} is not implemented.".format(args.nodal_update_strategy))
 # End of get_thresholds()
+
+
+def infer_node_membership(full_graph: Graph, full_graph_partition: Partition, sample_partition: Partition, 
+    args: Namespace) -> Partition:
+    """Reassigns nodes to different blocks based on Bayesian statistics.
+
+        Parameters
+        ---------
+        full_graph : Graph
+                the full, un-sampled graph
+        full_graph_partition : Partition
+                the Partition information for the full graph, including the sampled sub-graph
+        sample_partition : Partition
+                the Partition information for the sampled sub-graph
+        args : Namespace
+                the arguments provided by the user
+
+        Returns
+        -------
+        full_graph_partition : Partition
+                the updated partitioning results
+    """
+    print('Inferring block assignment for unsampled vertices')
+    for vertex in range(full_graph.num_nodes):
+        if full_graph_partition.block_assignment[vertex] >= sample_partition.num_blocks:
+            current_block_assignment = full_graph_partition.block_assignment[vertex]
+            full_graph_partition.block_assignment[vertex] = np.argmax(
+                full_graph_partition.interblock_edge_count[current_block_assignment][:sample_partition.num_blocks])
+    full_graph_partition.num_blocks = len(np.unique(full_graph_partition.block_assignment))
+    full_graph_partition.initialize_edge_counts(full_graph.out_neighbors, args.sparse)
+    return full_graph_partition
+# End of reassign_nodes()
+
