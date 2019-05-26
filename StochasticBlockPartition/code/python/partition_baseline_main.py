@@ -4,12 +4,14 @@
 import timeit
 import os, sys, argparse
 
+import numpy as np
+
 from partition_baseline_support import plot_graph_with_partition
 from partition_baseline_support import prepare_for_partition_on_next_num_blocks
 
 from partition import Partition, PartitionTriplet
 from block_merge import merge_blocks
-from node_reassignment import reassign_nodes
+from node_reassignment import reassign_nodes, infer_node_membership
 from graph import Graph
 from evaluate import evaluate_partition, Evaluation
 
@@ -118,9 +120,24 @@ if __name__ == "__main__":
             if partition_triplet.optimal_num_blocks_found:
                 print('\nOptimal partition found with {} blocks'.format(partition.num_blocks))
 
+    print('Combining sampled partition with full graph')
+    full_graph_partition = Partition(full_graph.num_nodes, full_graph.out_neighbors, args)
+    full_graph_partition.block_assignment = np.full(full_graph_partition.block_assignment.shape, -1)
+    for key, value in mapping.items():
+        full_graph_partition.block_assignment[key] = partition.block_assignment[value]
+    next_block = partition.num_blocks
+    for vertex in range(full_graph.num_nodes):
+        if full_graph_partition.block_assignment[vertex] == -1:
+            full_graph_partition.block_assignment[vertex] = next_block
+            next_block += 1
+    full_graph_partition.num_blocks = next_block
+    full_graph_partition.initialize_edge_counts(full_graph.out_neighbors, args.sparse)
+
+    infer_node_membership(full_graph, full_graph_partition, partition, args)
+
     t_end = timeit.default_timer()
     evaluation.total_runtime(t_start, t_end)
     print('\nGraph partition took {} seconds'.format(t_end - t_start))
 
     # evaluate output partition against the true partition
-    evaluate_partition(graph.true_block_assignment, partition.block_assignment, evaluation)
+    evaluate_partition(full_graph.true_block_assignment, full_graph_partition.block_assignment, evaluation)
