@@ -9,14 +9,17 @@ class MCMCTimings(object):
     """Stores timings for a single iteration of the MCMC update step.
     """
 
-    def __init__(self, superstep: int) -> None:
+    def __init__(self, superstep: int, step: str = "MCMC Updates") -> None:
         """Creates an MCMCTimings object.
 
             Parameters
             ----------
             superstep : int
                 the superstep of the algorithm for which MCMC timings are being collected
+            step : str
+                the name of the step
         """
+        self._step = step
         self.superstep = superstep
         self._start_t = 0.0
         self._start_b = False
@@ -200,7 +203,7 @@ class MCMCTimings(object):
             iteration : int (default = -1)
                 the current iteration
         """
-        writer.writerow([self.superstep, "MCMC Updates", iteration, substep, time])
+        writer.writerow([self.superstep, self._step, iteration, substep, time])
     # End of _writerow()
 
     def zeros(self):
