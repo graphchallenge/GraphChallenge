@@ -50,11 +50,18 @@ class Evaluation(object):
         'fraction of erroneous information',
         'num nodal updates',
         'num nodal update iterations',
+        'num finetuning updates',
+        'num finetuning iterations',
         'num iterations',
+        'graph loading time',
+        'sampling time',
         'total partition time',
         'total nodal update time',
         'total block merge time',
-        'prepare the next iteration'
+        'prepare the next iteration',
+        'merging partitioned sample time',
+        'cluster propagation time',
+        'finetuning membership time'
     ]
 
     DETAILS_FIELD_NAMES = [
@@ -111,14 +118,22 @@ class Evaluation(object):
         # Algorithm runtime measures
         self.num_nodal_updates = 0
         self.num_nodal_update_iterations = 0
+        self.num_finetuning_updates = 0
+        self.num_finetuning_iterations = 0
         self.num_iterations = 0
+        self.loading = 0.0
+        self.sampling = 0.0
         self.total_partition_time = 0.0
         self.total_block_merge_time = 0.0
         self.total_nodal_update_time = 0.0
         self.prepare_next_partition = 0.0
+        self.merge_sample = 0.0
+        self.propagate_membership = 0.0
+        self.finetune_membership = 0.0
         self.prepare_next_partitions = list()  # type: List[float]
         self.mcmc_details = list()  # type: List[MCMCTimings]
         self.block_merge_details = list()  # type: List[BlockMergeTimings]
+        self.finetuning_details = None
     # End of __init__()
 
     def update_timings(self, block_merge_start_t: float, node_update_start_t: float, prepare_next_start_t: float,
@@ -203,11 +218,18 @@ class Evaluation(object):
                 self.erroneous_info,
                 self.num_nodal_updates,
                 self.num_nodal_update_iterations,
+                self.num_finetuning_updates,
+                self.num_finetuning_iterations,
                 self.num_iterations,
+                self.loading,
+                self.sampling,
                 self.total_partition_time,
                 self.total_nodal_update_time,
                 self.total_block_merge_time,
-                self.prepare_next_partition
+                self.prepare_next_partition,
+                self.merge_sample,
+                self.propagate_membership,
+                self.finetune_membership
             ])
         self._save_details()
     # End of save()
@@ -229,6 +251,8 @@ class Evaluation(object):
                 self.mcmc_details[i].save(writer)
                 self.block_merge_details[i].save(writer)
                 writer.writerow([i, "Preparing for Next Iteration", -1, "-", self.prepare_next_partitions[i]])
+            if self.finetuning_details is not None:
+                self.finetuning_details.save(writer)
     # End of _save_details()
 
     def add_mcmc_timings(self) -> "MCMCTimings":
@@ -242,6 +266,18 @@ class Evaluation(object):
         mcmc_timings = MCMCTimings(len(self.mcmc_details))
         self.mcmc_details.append(mcmc_timings)
         return mcmc_timings
+    # End of add_mcmc_timings()
+
+    def add_finetuning_timings(self) -> "MCMCTimings":
+        """Adds an empty MCMCTimings object to self.mcmc_details
+
+            Returns
+            -------
+            finetuning_details : MCMCTimings
+                the empty MCMCTimings object
+        """
+        self.finetuning_details = MCMCTimings(len(self.mcmc_details), "Finetuning Updates")
+        return self.finetuning_details
     # End of add_mcmc_timings()
 
     def add_block_merge_timings(self) -> "BlockMergeTimings":
