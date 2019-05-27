@@ -266,7 +266,7 @@ def get_thresholds(current_iteration: int, args: Namespace) -> Tuple[float, floa
 # End of get_thresholds()
 
 
-def infer_node_membership(full_graph: Graph, full_graph_partition: Partition, sample_partition: Partition, 
+def propagate_membership(full_graph: Graph, full_graph_partition: Partition, sample_partition: Partition, 
     args: Namespace) -> Partition:
     """Reassigns nodes to different blocks based on Bayesian statistics.
 
@@ -297,3 +297,74 @@ def infer_node_membership(full_graph: Graph, full_graph_partition: Partition, sa
     return full_graph_partition
 # End of reassign_nodes()
 
+
+def fine_tune_membership(partition: Partition, graph: Graph, evaluation: Evaluation, args: Namespace) -> Partition:
+    """Finetunes block assignment for graph vertices based on Bayesian statistics.
+
+        Parameters
+        ---------
+        partition : Partition
+                the current partitioning results
+        graph : Graph
+                the loaded Graph object
+        evaluation : Evaluation
+                stores the evaluation metrics
+        args : Namespace
+                the command-line arguments
+
+        Returns
+        -------
+        partition : Partition
+                the updated partitioning results
+    """
+    delta_entropy_moving_avg_window = 1  # width of the moving average window for the delta entropy convergence criterion
+
+    mcmc_timings = evaluation.add_finetuning_timings()
+
+    mcmc_timings.t_initialization()
+    itr_delta_entropy = np.zeros(args.iterations)
+    _, delta_entropy_threshold2 = get_thresholds(evaluation.num_iterations, args)
+    mcmc_timings.t_initialization()
+
+    # compute the global entropy for MCMC convergence criterion
+    mcmc_timings.t_compute_initial_entropy()
+    partition.overall_entropy = compute_overall_entropy(partition, graph.num_nodes, graph.num_edges, args.sparse)
+    mcmc_timings.t_compute_initial_entropy()
+
+    for itr in range(args.iterations):
+        evaluation.num_finetuning_iterations += 1
+        num_nodal_moves = 0
+        itr_delta_entropy[itr] = 0
+
+        for current_node in range(graph.num_nodes):
+            delta_entropy, did_move = propose_new_assignment(current_node, partition, graph, args, mcmc_timings)
+            if did_move:
+                evaluation.num_finetuning_updates += 1
+                num_nodal_moves += 1
+                itr_delta_entropy[itr] += delta_entropy
+
+        # End of iteration_over_nodes
+        if args.verbose:
+            print("Number of finetuning moves: {}, delta S: {:0.5f}".format(
+                  num_nodal_moves, itr_delta_entropy[itr] / float(partition.overall_entropy)))
+
+        # exit MCMC if the recent change in entropy falls below a small fraction of the overall entropy
+        mcmc_timings.t_early_stopping()
+        if itr >= (delta_entropy_moving_avg_window - 1):
+            if (-np.mean(itr_delta_entropy[(itr - delta_entropy_moving_avg_window + 1):itr]) < (
+                delta_entropy_threshold2 * partition.overall_entropy)):
+                mcmc_timings.t_early_stopping()
+                break
+        mcmc_timings.t_early_stopping()
+
+    # compute the global entropy for determining the optimal number of blocks
+    mcmc_timings.t_compute_final_entropy()
+    partition.overall_entropy = compute_overall_entropy(partition, graph.num_nodes, graph.num_edges, args.sparse)
+    mcmc_timings.t_compute_final_entropy()
+
+    if args.verbose:
+        print("Total number of finetuning moves: {}, overall_entropy: {:0.2f}".format(
+            evaluation.num_finetuning_updates, partition.overall_entropy))
+
+    return partition
+# End of reassign_nodes()
