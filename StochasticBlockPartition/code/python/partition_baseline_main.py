@@ -3,6 +3,7 @@
 
 import timeit
 import os, sys, argparse
+from typing import Tuple
 
 import numpy as np
 
@@ -11,7 +12,7 @@ from partition_baseline_support import prepare_for_partition_on_next_num_blocks
 
 from partition import Partition, PartitionTriplet
 from block_merge import merge_blocks
-from node_reassignment import reassign_nodes, infer_node_membership
+from node_reassignment import reassign_nodes, propagate_membership, fine_tune_membership
 from graph import Graph
 from evaluate import evaluate_partition, Evaluation
 
@@ -55,30 +56,18 @@ def parse_arguments():
 # End of parse_arguments()
 
 
-if __name__ == "__main__":
-    args = parse_arguments()
-
-    true_partition_available = True
-    visualize_graph = False  # whether to plot the graph layout colored with intermediate partitions
-
-    full_graph = Graph.load(args)
-    graph, mapping = full_graph.sample(args)
-
-    if args.verbose:
-        print('Number of nodes: {}'.format(graph.num_nodes))
-        print('Number of edges: {}'.format(graph.num_edges))
-
+def stochastic_block_partition(graph: Graph, args: argparse.Namespace) -> Tuple[Partition, Evaluation]:
+    """The stochastic block partitioning algorithm
+    """ 
+    visualize_graph = False
     evaluation = Evaluation(args, graph)
-
-    t_start = timeit.default_timer()
 
     partition = Partition(graph.num_nodes, graph.out_neighbors, args)
 
     # initialize items before iterations to find the partition with the optimal number of blocks
     partition_triplet = PartitionTriplet()
     graph_object = None
-
-    # begin partitioning by finding the best partition with the optimal number of blocks
+    
     while not partition_triplet.optimal_num_blocks_found:
         ##################
         # BLOCK MERGING
@@ -87,7 +76,8 @@ if __name__ == "__main__":
         t_block_merge_start = timeit.default_timer()
 
         if args.verbose:
-            print("\nMerging down blocks from {} to {}".format(partition.num_blocks, partition.num_blocks - partition.num_blocks_to_merge))
+            print("\nMerging down blocks from {} to {}".format(partition.num_blocks,
+                                                               partition.num_blocks - partition.num_blocks_to_merge))
         
         partition = merge_blocks(partition, args.blockProposals, args.sparse, graph.out_neighbors, evaluation)
 
@@ -119,25 +109,72 @@ if __name__ == "__main__":
             print('Number of blocks: {}'.format(partition_triplet.num_blocks))
             if partition_triplet.optimal_num_blocks_found:
                 print('\nOptimal partition found with {} blocks'.format(partition.num_blocks))
+    return partition, evaluation
+# End of stochastic_block_partition()
 
-    print('Combining sampled partition with full graph')
-    full_graph_partition = Partition(full_graph.num_nodes, full_graph.out_neighbors, args)
-    full_graph_partition.block_assignment = np.full(full_graph_partition.block_assignment.shape, -1)
-    for key, value in mapping.items():
-        full_graph_partition.block_assignment[key] = partition.block_assignment[value]
-    next_block = partition.num_blocks
-    for vertex in range(full_graph.num_nodes):
-        if full_graph_partition.block_assignment[vertex] == -1:
-            full_graph_partition.block_assignment[vertex] = next_block
-            next_block += 1
-    full_graph_partition.num_blocks = next_block
-    full_graph_partition.initialize_edge_counts(full_graph.out_neighbors, args.sparse)
 
-    infer_node_membership(full_graph, full_graph_partition, partition, args)
+if __name__ == "__main__":
+    args = parse_arguments()
+
+    true_partition_available = True
+    visualize_graph = False  # whether to plot the graph layout colored with intermediate partitions
+
+    t_start = timeit.default_timer()
+    
+    if args.sample_size < 100:
+        full_graph = Graph.load(args)
+        t_load = timeit.default_timer()    
+        graph, mapping = full_graph.sample(args)
+        t_sample = timeit.default_timer()
+        print("Performing stochastic block partitioning on sampled subgraph")
+    else: 
+        graph = Graph.load(args)
+        t_load = timeit.default_timer()
+        t_sample = timeit.default_timer()
+        print("Performing stochastic block partitioning")
+
+    if args.verbose:
+        print('Number of nodes: {}'.format(graph.num_nodes))
+        print('Number of edges: {}'.format(graph.num_edges))
+
+    # begin partitioning by finding the best partition with the optimal number of blocks
+    partition, evaluation = stochastic_block_partition(graph, args)
+
+    if args.sample_size < 100:
+        print('Combining sampled partition with full graph')
+        t_start_merge_sample = timeit.default_timer()
+        full_graph_partition = Partition(full_graph.num_nodes, full_graph.out_neighbors, args)
+        full_graph_partition.block_assignment = np.full(full_graph_partition.block_assignment.shape, -1)
+        for key, value in mapping.items():
+            full_graph_partition.block_assignment[key] = partition.block_assignment[value]
+        next_block = partition.num_blocks
+        for vertex in range(full_graph.num_nodes):
+            if full_graph_partition.block_assignment[vertex] == -1:
+                full_graph_partition.block_assignment[vertex] = next_block
+                next_block += 1
+        full_graph_partition.num_blocks = next_block
+        full_graph_partition.initialize_edge_counts(full_graph.out_neighbors, args.sparse)
+        t_merge_sample = timeit.default_timer()
+
+        full_graph_partition = propagate_membership(full_graph, full_graph_partition, partition, args)
+        t_propagate_membership = timeit.default_timer()
+
+        full_graph_partition = fine_tune_membership(full_graph_partition, full_graph, evaluation, args)
+        t_fine_tune_membership = timeit.default_timer()
 
     t_end = timeit.default_timer()
-    evaluation.total_runtime(t_start, t_end)
     print('\nGraph partition took {} seconds'.format(t_end - t_start))
 
-    # evaluate output partition against the true partition
-    evaluate_partition(full_graph.true_block_assignment, full_graph_partition.block_assignment, evaluation)
+    evaluation.total_runtime(t_start, t_end)
+    evaluation.loading = t_load - t_start
+    evaluation.sampling = t_sample - t_load
+
+    if args.sample_size < 100:
+        evaluation.merge_sample = t_merge_sample - t_start_merge_sample
+        evaluation.propagate_membership = t_propagate_membership - t_merge_sample
+        evaluation.finetune_membership = t_fine_tune_membership - t_propagate_membership
+
+        # evaluate output partition against the true partition
+        evaluate_partition(full_graph.true_block_assignment, full_graph_partition.block_assignment, evaluation)
+    else:
+        evaluate_partition(graph.true_block_assignment, partition.block_assignment, evaluation)
