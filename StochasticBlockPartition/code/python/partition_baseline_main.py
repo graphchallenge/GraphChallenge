@@ -171,6 +171,8 @@ if __name__ == "__main__":
     evaluation.sampling = t_sample - t_load
 
     if args.sample_size < 100:
+        evaluation.num_nodes = full_graph.num_nodes
+        evaluation.num_edges = full_graph.num_edges
         evaluation.merge_sample = t_merge_sample - t_start_merge_sample
         evaluation.propagate_membership = t_propagate_membership - t_merge_sample
         evaluation.finetune_membership = t_fine_tune_membership - t_propagate_membership
