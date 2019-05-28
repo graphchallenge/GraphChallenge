@@ -18,7 +18,7 @@ from partition_baseline_support import update_partition
 from partition import Partition
 from partition import PartitionTriplet
 from graph import Graph
-from evaluate import Evaluation
+from evaluation import Evaluation
 from mcmc_timings import MCMCTimings
 
 

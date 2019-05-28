@@ -14,7 +14,8 @@ from partition import Partition, PartitionTriplet
 from block_merge import merge_blocks
 from node_reassignment import reassign_nodes, propagate_membership, fine_tune_membership
 from graph import Graph
-from evaluate import evaluate_partition, Evaluation
+from evaluate import evaluate_partition
+from evaluation import Evaluation
 
 
 def parse_arguments():

@@ -12,7 +12,7 @@ from partition_baseline_support import compute_delta_entropy
 from partition_baseline_support import carry_out_best_merges
 
 from partition import Partition
-from evaluate import Evaluation
+from evaluation import Evaluation
 from block_merge_timings import BlockMergeTimings
 
 
