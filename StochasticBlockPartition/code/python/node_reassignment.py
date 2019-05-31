@@ -317,7 +317,7 @@ def fine_tune_membership(partition: Partition, graph: Graph, evaluation: Evaluat
         partition : Partition
                 the updated partitioning results
     """
-    delta_entropy_moving_avg_window = 1  # width of the moving average window for the delta entropy convergence criterion
+    delta_entropy_moving_avg_window = 2  # width of the moving average window for the delta entropy convergence criterion
 
     mcmc_timings = evaluation.add_finetuning_timings()
 
