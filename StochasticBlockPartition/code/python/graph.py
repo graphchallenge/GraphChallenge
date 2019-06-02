@@ -78,7 +78,7 @@ class Graph():
         return graph
     # End of load()
 
-    def sample(self, args: argparse.Namespace) -> Tuple['Graph', Dict[int,int]]:
+    def sample(self, args: argparse.Namespace) -> Tuple['Graph', Dict[int,int], Dict[int,int]]:
         """Sample a set of vertices from the graph.
 
             Parameters
@@ -116,7 +116,8 @@ class Graph():
         true_blocks = list(set(true_block_assignment))
         true_blocks_mapping = dict([(v, k) for k,v in enumerate(true_blocks)])
         true_block_assignment = [true_blocks_mapping[b] for b in true_block_assignment]
-        return Graph(new_out_neighbors, new_in_neighbors, sample_num, num_edges, true_block_assignment), mapping
+        subgraph = Graph(new_out_neighbors, new_in_neighbors, sample_num, num_edges, true_block_assignment)
+        return subgraph, mapping, true_blocks_mapping
     # End of sample()
 # End of Graph()
 

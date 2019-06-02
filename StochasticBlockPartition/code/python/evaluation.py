@@ -4,8 +4,10 @@
 import os
 import csv
 
-from typing import List
+from typing import List, Dict
 from argparse import Namespace
+
+import numpy as np
 
 from graph import Graph
 from mcmc_timings import MCMCTimings
@@ -22,6 +24,9 @@ class Evaluation(object):
         'streaming type',
         'num vertices',
         'num edges',
+        'blocks retained (%)',
+        'difference in within to between edge ratios',
+        'difference from ideal sample',
         'num block proposals',
         'beta',
         'sample size (%)',
@@ -87,6 +92,10 @@ class Evaluation(object):
         self.streaming_type = args.type
         self.num_nodes = graph.num_nodes
         self.num_edges = graph.num_edges
+        # Sampling evaluation
+        self.blocks_retained = 0.0
+        self.edge_ratio_diff = 0.0
+        self.difference_from_ideal_sample = 0.0
         # Algorithm parameters
         self.num_block_proposals = args.blockProposals
         self.beta = args.beta
@@ -131,6 +140,42 @@ class Evaluation(object):
         self.block_merge_details = list()  # type: List[BlockMergeTimings]
         self.finetuning_details = None
     # End of __init__()
+
+
+    def evaluate_subgraph_sampling(self, full_graph: Graph, subgraph: Graph, full_blockmatrix: np.ndarray,
+        subgraph_blockmatrix: np.ndarray, mapping: Dict[int, int]):
+        """Evaluates the goodness of the samples returned by the subgraph.
+        """
+        #####
+        # % of communities retained
+        #####
+        full_graph_num_blocks = len(np.unique(full_graph.true_block_assignment))
+        subgraph_num_blocks = len(np.unique(subgraph.true_block_assignment))
+
+        self.blocks_retained = subgraph_num_blocks / full_graph_num_blocks
+
+        #####
+        # % difference in ratio of within-block to between-block edges
+        #####
+        subgraph_edge_ratio = subgraph_blockmatrix.trace() / subgraph_blockmatrix.sum()
+        graph_edge_ratio = full_blockmatrix.trace() / full_blockmatrix.sum()
+        self.edge_ratio_diff = graph_edge_ratio / subgraph_edge_ratio
+
+        #####
+        # Normalized difference from ideal-block membership
+        #####
+        full_graph_membership_nums = np.zeros(full_graph_num_blocks)
+        for block_membership in full_graph.true_block_assignment:
+            full_graph_membership_nums[block_membership] += 1
+        subgraph_membership_nums = np.zeros(full_graph_num_blocks)
+        # invert dict to map subgraph block id to full graph block id
+        true_block_mapping = dict([(v, k) for k, v in mapping.items()])
+        for block_membership in subgraph.true_block_assignment:
+            subgraph_membership_nums[true_block_mapping[block_membership]] += 1
+        ideal_block_membership_nums = full_graph_membership_nums * (subgraph.num_nodes / full_graph.num_nodes)
+        difference_from_ideal_block_membership_nums = np.abs(ideal_block_membership_nums - subgraph_membership_nums)
+        self.difference_from_ideal_sample = np.sum(difference_from_ideal_block_membership_nums / subgraph.num_nodes)
+    # End of evaluate_subgraph_sampling()
 
     def update_timings(self, block_merge_start_t: float, node_update_start_t: float, prepare_next_start_t: float,
         prepare_next_end_t: float):
@@ -190,6 +235,9 @@ class Evaluation(object):
                 self.streaming_type,
                 self.num_nodes,
                 self.num_edges,
+                self.blocks_retained,
+                self.edge_ratio_diff,
+                self.difference_from_ideal_sample,
                 self.num_block_proposals,
                 self.beta,
                 self.sample_size,
