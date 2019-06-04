@@ -33,6 +33,7 @@ class Partition():
         self.block_degrees = np.zeros(num_blocks)
         self.block_degrees_out = np.zeros(num_blocks)
         self.block_degrees_in = np.zeros(num_blocks)
+        self._args = args
         self.num_blocks_to_merge = int(self.num_blocks * args.blockReductionRate)
         self.initialize_edge_counts(out_neighbors, args.sparse)
     # End of __init__()
@@ -83,6 +84,29 @@ class Partition():
         self.block_degrees_in = np.asarray(self.interblock_edge_count.sum(axis=0)).ravel()
         self.block_degrees = self.block_degrees_out + self.block_degrees_in
     # End of initialize_edge_counts()
+
+    def clone_with_true_block_membership(self, out_neighbors: List[np.ndarray], 
+        true_block_membership: np.ndarray) -> 'Partition':
+        """Creates a new Partition object for the correctly partitioned graph.
+
+            Parameters
+            ----------
+            out_neighbors : List[np.ndarray]
+                    list of outgoing edges for each node
+            true_block_membership : np.ndarray [int]
+                    the correct block membership for every vertex
+            
+            Returns
+            ------
+            partition : Partition
+                    the Partition when the partitioning is 100% accurate
+        """
+        partition = Partition(len(true_block_membership), out_neighbors, self._args)
+        partition.block_assignment = true_block_membership
+        partition.num_blocks = len(np.unique(true_block_membership))
+        partition.initialize_edge_counts(out_neighbors, self._args.sparse)
+        return partition
+    # End of clone_with_true_block_membership()
 
 
 class PartitionTriplet():

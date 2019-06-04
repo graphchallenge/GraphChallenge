@@ -142,8 +142,8 @@ class Evaluation(object):
     # End of __init__()
 
 
-    def evaluate_subgraph_sampling(self, full_graph: Graph, subgraph: Graph, full_blockmatrix: np.ndarray,
-        subgraph_blockmatrix: np.ndarray, mapping: Dict[int, int]):
+    def evaluate_subgraph_sampling(self, full_graph: Graph, subgraph: Graph, full_partition: 'partition.Partition',
+        subgraph_partition: 'partition.Partition', mapping: Dict[int, int]):
         """Evaluates the goodness of the samples returned by the subgraph.
         """
         #####
@@ -157,7 +157,13 @@ class Evaluation(object):
         #####
         # % difference in ratio of within-block to between-block edges
         #####
+        true_subgraph_partition = subgraph_partition.clone_with_true_block_membership(subgraph.out_neighbors,
+                                                                                      subgraph.true_block_assignment)
+        subgraph_blockmatrix = true_subgraph_partition.interblock_edge_count
         subgraph_edge_ratio = subgraph_blockmatrix.trace() / subgraph_blockmatrix.sum()
+        true_full_partition = full_partition.clone_with_true_block_membership(full_graph.out_neighbors,
+                                                                              full_graph.true_block_assignment)
+        full_blockmatrix = true_full_partition.interblock_edge_count
         graph_edge_ratio = full_blockmatrix.trace() / full_blockmatrix.sum()
         self.edge_ratio_diff = graph_edge_ratio / subgraph_edge_ratio
 

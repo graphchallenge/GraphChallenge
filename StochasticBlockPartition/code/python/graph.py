@@ -115,7 +115,7 @@ class Graph():
         true_block_assignment = self.true_block_assignment[sample_idx]
         true_blocks = list(set(true_block_assignment))
         true_blocks_mapping = dict([(v, k) for k,v in enumerate(true_blocks)])
-        true_block_assignment = [true_blocks_mapping[b] for b in true_block_assignment]
+        true_block_assignment = np.asarray([true_blocks_mapping[b] for b in true_block_assignment])
         subgraph = Graph(new_out_neighbors, new_in_neighbors, sample_num, num_edges, true_block_assignment)
         return subgraph, mapping, true_blocks_mapping
     # End of sample()

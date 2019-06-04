@@ -171,8 +171,8 @@ if __name__ == "__main__":
     evaluation.sampling = t_sample - t_load
 
     if args.sample_size < 100:
-        evaluation.evaluate_subgraph_sampling(full_graph, graph, full_graph_partition.interblock_edge_count,
-                                              partition.interblock_edge_count, block_assignment_mapping)
+        evaluation.evaluate_subgraph_sampling(full_graph, graph, full_graph_partition, partition,
+                                              block_assignment_mapping)
         evaluation.num_nodes = full_graph.num_nodes
         evaluation.num_edges = full_graph.num_edges
         evaluation.merge_sample = t_merge_sample - t_start_merge_sample
