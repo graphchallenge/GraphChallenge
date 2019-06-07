@@ -14,7 +14,7 @@ from partition import Partition, PartitionTriplet
 from block_merge import merge_blocks
 from node_reassignment import reassign_nodes, propagate_membership, fine_tune_membership
 from graph import Graph
-from evaluate import evaluate_partition
+from evaluate import evaluate_partition, evaluate_subgraph_partition
 from evaluation import Evaluation
 
 
@@ -180,6 +180,7 @@ if __name__ == "__main__":
         evaluation.finetune_membership = t_fine_tune_membership - t_propagate_membership
 
         # evaluate output partition against the true partition
+        evaluate_subgraph_partition(graph.true_block_assignment, partition.block_assignment, evaluation)
         evaluate_partition(full_graph.true_block_assignment, full_graph_partition.block_assignment, evaluation)
     else:
         evaluate_partition(graph.true_block_assignment, partition.block_assignment, evaluation)
