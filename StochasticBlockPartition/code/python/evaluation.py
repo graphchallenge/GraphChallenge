@@ -27,6 +27,20 @@ class Evaluation(object):
         'blocks retained (%)',
         'difference in within to between edge ratios',
         'difference from ideal sample',
+        'subgraph num blocks in algorithm partition',
+        'subgraph num blocks in truth partition',
+        'subgraph accuracy',
+        'subgraph rand index',
+        'subgraph adjusted rand index',
+        'subgraph pairwise recall',
+        'subgraph pairwise precision',
+        'subgraph entropy of algorithm partition',
+        'subgraph entropy of truth partition',
+        'subgraph entropy of algorithm partition given truth partition',
+        'subgraph entropy of truth partition given algorithm partition',
+        'subgraph mutual information',
+        'subgraph fraction of missed information',
+        'subgraph fraction of erroneous information',
         'num block proposals',
         'beta',
         'sample size (%)',
@@ -96,6 +110,20 @@ class Evaluation(object):
         self.blocks_retained = 0.0
         self.edge_ratio_diff = 0.0
         self.difference_from_ideal_sample = 0.0
+        self.subgraph_num_blocks_algorithm = 0
+        self.subgraph_num_blocks_truth = 0
+        self.subgraph_accuracy = 0.0
+        self.subgraph_rand_index = 0.0
+        self.subgraph_adjusted_rand_index = 0.0
+        self.subgraph_pairwise_recall = 0.0
+        self.subgraph_pairwise_precision = 0.0
+        self.subgraph_entropy_algorithm = 0.0
+        self.subgraph_entropy_truth = 0.0
+        self.subgraph_entropy_algorithm_given_truth = 0.0
+        self.subgraph_entropy_truth_given_algorithm = 0.0
+        self.subgraph_mutual_info = 0.0
+        self.subgraph_missed_info = 0.0
+        self.subgraph_erroneous_info = 0.0
         # Algorithm parameters
         self.num_block_proposals = args.blockProposals
         self.beta = args.beta
@@ -244,6 +272,20 @@ class Evaluation(object):
                 self.blocks_retained,
                 self.edge_ratio_diff,
                 self.difference_from_ideal_sample,
+                self.subgraph_num_blocks_algorithm,
+                self.subgraph_num_blocks_truth,
+                self.subgraph_accuracy,
+                self.subgraph_rand_index,
+                self.subgraph_adjusted_rand_index,
+                self.subgraph_pairwise_recall,
+                self.subgraph_pairwise_precision,
+                self.subgraph_entropy_algorithm,
+                self.subgraph_entropy_truth,
+                self.subgraph_entropy_algorithm_given_truth,
+                self.subgraph_entropy_truth_given_algorithm,
+                self.subgraph_mutual_info,
+                self.subgraph_missed_info,
+                self.subgraph_erroneous_info,
                 self.num_block_proposals,
                 self.beta,
                 self.sample_size,
