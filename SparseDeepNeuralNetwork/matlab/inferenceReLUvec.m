@@ -2,6 +2,8 @@ function Y = inferenceReLUvec(W,bias,Y0);
 % Performs ReLU inference  using input feature vector(s) Y0,
 % DNN weights W, and constant bias.
 
+  YMAX = 32;   % Set max value.
+
   % Initialized feature vectors.
   Y = Y0;
   
@@ -19,16 +21,11 @@ function Y = inferenceReLUvec(W,bias,Y0);
      
      % Threshold negative values.
      Y(Y < 0) = 0;
+
+     % Threshold maximum values.
+     Y(Y > YMAX) = YMAX;
      
   end
   
 return
 end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Software Engineer: Dr. Jeremy Kepner
-% MIT 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% (c) <2019> Massachusetts Institute of Technology
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
