@@ -109,7 +109,7 @@ class Sample():
             elif np.random.random() < 0.15:  # With a probability of 0.15, restart at original node
                 vertex = start
             elif len(old_out_neighbors[vertex]) > 0:  # If the vertex has out neighbors, go to one of them
-                vertex = np.random.choice(old_out_neighbors[vertex])
+                vertex = np.random.choice(old_out_neighbors[vertex][:,0])
             else:  # Otherwise, restart from the original vertex
                 if len(old_out_neighbors[start]) == 0:  # if original vertex has no out neighbors, change it
                     start = np.random.randint(sample_num)
@@ -143,7 +143,7 @@ class Sample():
                 vertex = start
                 num_tries = 0
             elif len(old_out_neighbors[vertex]) > 0:  # If the vertex has out neighbors, go to one of them
-                vertex = np.random.choice(old_out_neighbors[vertex])
+                vertex = np.random.choice(old_out_neighbors[vertex][:,0])
             else:  # Otherwise, restart from the original vertex
                 if len(old_out_neighbors[start]) == 0:  # if original vertex has no out neighbors, change it
                     start = np.random.randint(sample_num)
@@ -163,7 +163,7 @@ class Sample():
         print("Sampling {} vertices from graph".format(sample_num))
         vertex_degrees = np.add([len(neighbors) for neighbors in old_out_neighbors], 
                                 [len(neighbors) for neighbors in old_in_neighbors])
-        sample_idx = np.random.choice(num_vertices, sample_num, replace=False, p=vertex_degrees)
+        sample_idx = np.random.choice(num_vertices, sample_num, replace=False, p=vertex_degrees/np.sum(vertex_degrees))
         return Sample(sample_idx, old_out_neighbors, old_in_neighbors, old_true_block_assignment)
     # End of Random_walk_sampling()
 
@@ -190,6 +190,7 @@ class Sample():
             if len(index_set) >= sample_num:
                 break
         sample_idx = np.asarray(index_set[:sample_num])
+        print(sample_idx)
         return Sample(sample_idx, old_out_neighbors, old_in_neighbors, old_true_block_assignment)
     # End of random_node_neighbor_sample()
 
