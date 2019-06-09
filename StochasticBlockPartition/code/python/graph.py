@@ -9,6 +9,8 @@ import argparse
 import numpy as np
 import pandas as pd
 
+from sample import Sample
+
 
 class Graph():
     """Holds the graph variables that do not change due to partitioning.
@@ -88,36 +90,18 @@ class Graph():
             
             Returns
             ------
-            graph : Graph
-                    the sampled Graph object
+            subgraph : Graph
+                    the subgraph created from the sampled Graph vertices
+            vertex_mapping : Dict[int,int]
+                    the mapping of vertex ids in full graph to vertex ids in subgraph
+            true_blocks_mapping : Dict[int,int]
+                    the mapping of block ids in full graph to block ids in subgraph
         """
-        sample_num = int(self.num_nodes * (args.sample_size / 100))
-        print("Sampling {} vertices from graph".format(sample_num))
-        sample_idx = np.random.choice(self.num_nodes, sample_num, replace=False)
-        mapping = dict([(v, k) for k,v in enumerate(sample_idx)])
-        new_out_neighbors = list()  # type: List[np.ndarray]
-        new_in_neighbors = list()  # type: List[np.ndarray]
-        num_edges = 0
-        for index in sample_idx:
-            out_neighbors = self.out_neighbors[index]
-            out_mask = np.isin(out_neighbors[:,0], sample_idx, assume_unique=False)
-            sampled_out_neighbors = out_neighbors[out_mask]
-            for out_neighbor in sampled_out_neighbors:
-                out_neighbor[0] = mapping[out_neighbor[0]]
-            new_out_neighbors.append(sampled_out_neighbors)
-            in_neighbors = self.in_neighbors[index]
-            in_mask = np.isin(in_neighbors[:,0], sample_idx, assume_unique=False)
-            sampled_in_neighbors = in_neighbors[in_mask]
-            for in_neighbor in sampled_in_neighbors:
-                in_neighbor[0] = mapping[in_neighbor[0]]
-            new_in_neighbors.append(sampled_in_neighbors)
-            num_edges += np.sum(out_mask) + np.sum(in_mask)
-        true_block_assignment = self.true_block_assignment[sample_idx]
-        true_blocks = list(set(true_block_assignment))
-        true_blocks_mapping = dict([(v, k) for k,v in enumerate(true_blocks)])
-        true_block_assignment = np.asarray([true_blocks_mapping[b] for b in true_block_assignment])
-        subgraph = Graph(new_out_neighbors, new_in_neighbors, sample_num, num_edges, true_block_assignment)
-        return subgraph, mapping, true_blocks_mapping
+        sample = Sample.create_sample(self.num_nodes, self.out_neighbors, self.in_neighbors, self.true_block_assignment,
+                                      args)
+        subgraph = Graph(sample.out_neighbors, sample.in_neighbors, sample.sample_num, sample.num_edges,
+                         sample.true_block_assignment)
+        return subgraph, sample.vertex_mapping, sample.true_blocks_mapping
     # End of sample()
 # End of Graph()
 
