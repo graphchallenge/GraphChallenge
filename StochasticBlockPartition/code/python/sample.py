@@ -189,7 +189,6 @@ class Sample():
             if len(index_set) >= sample_num:
                 break
         sample_idx = np.asarray(index_set[:sample_num])
-        print(sample_idx)
         return Sample(sample_idx, old_out_neighbors, old_in_neighbors, old_true_block_assignment)
     # End of random_node_neighbor_sample()
 
