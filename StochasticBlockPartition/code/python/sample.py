@@ -49,7 +49,6 @@ class Sample():
         args: 'argparse.Namespace') -> 'Sample':
         """Performs sampling according to the sample type in args.
         """
-        # (uniform_random|random_walk|random_jump|degree_weighted|random_node_neighbor|forest_fire)
         if args.sample_type == "uniform_random":
             return Sample.uniform_random_sample(num_vertices, old_out_neighbors, old_in_neighbors,
                                                 old_true_block_assignment, args)
@@ -216,6 +215,8 @@ class Sample():
                 # select edges to burn
                 num_to_choose = np.random.geometric(0.7)
                 out_neighbors = old_out_neighbors[vertex]
+                if len(out_neighbors) < 1:  # If there are no outgoing neighbors
+                    continue
                 if len(out_neighbors) <= num_to_choose:
                     num_to_choose = len(out_neighbors)
                 mask = np.zeros(len(out_neighbors))
