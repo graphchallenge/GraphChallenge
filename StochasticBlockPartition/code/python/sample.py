@@ -185,7 +185,7 @@ class Sample():
             for neighbor in old_out_neighbors[vertex]:
                 if not sampled_marker[neighbor[0]]:
                     index_set.append(neighbor[0])
-                    sampled_marker[neighbor[0]]
+                    sampled_marker[neighbor[0]] = True
             if len(index_set) >= sample_num:
                 break
         sample_idx = np.asarray(index_set[:sample_num])
