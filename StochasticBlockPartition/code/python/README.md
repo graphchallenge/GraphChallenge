@@ -41,11 +41,15 @@ To install these dependencies, use `pip` with the provided `requirements.txt` fi
 ## Usage
 
 ```
-python partition_baseline_main.py [-h] [-p PARTS] [-o OVERLAP]
+partition_baseline_main.py [-h] [-p PARTS] [-o OVERLAP]
                                   [-s BLOCKSIZEVAR] [-t TYPE] [-n NUMNODES]
                                   [-d DIRECTORY] [-v] [-b BLOCKPROPOSALS]
                                   [-i ITERATIONS] [-r BLOCKREDUCTIONRATE]
                                   [--beta BETA] [--sparse] [-c CSV]
+                                  [-u NODAL_UPDATE_STRATEGY]
+                                  [--direction DIRECTION] [-f FACTOR]
+                                  [-e THRESHOLD] [-z SAMPLE_SIZE]
+                                  [-m {uniform_random,random_walk,random_jump,degree_weighted,random_node_neighbor,forest_fire,none}]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -78,6 +82,27 @@ optional arguments:
                         representation for the matrices.
   -c CSV, --csv CSV     The filepath to the csv file in which to store the
                         evaluation results.
+  -u NODAL_UPDATE_STRATEGY, --nodal_update_strategy NODAL_UPDATE_STRATEGY
+                        (original|step|exponential|log). Default = original
+  --direction DIRECTION
+                        (growth|decay) Default = growth
+  -f FACTOR, --factor FACTOR
+                        The factor by which to grow or decay the nodal update
+                        threshold. If the nodal update strategy is step: this
+                        value is added to or subtracted from the threshold
+                        with every iteration If the nodal update strategy is
+                        exponential: this (1 +/- this value) is multiplied by
+                        the threshold with every iteration If the nodal update
+                        strategy is log: this value is ignored Default =
+                        0.0001
+  -e THRESHOLD, --threshold THRESHOLD
+                        The threshold at which to stop nodal block
+                        reassignment. Default = 5e-4
+  -z SAMPLE_SIZE, --sample_size SAMPLE_SIZE
+                        The percent of total nodes to use as sample. Default =
+                        100 (no sampling)
+  -m {uniform_random,random_walk,random_jump,degree_weighted,random_node_neighbor,forest_fire,none}, --sample_type {uniform_random,random_walk,random_jump,degree_weighted,random_node_neighbor,forest_fire,none}
+                        Sampling algorithm to use. Default = none
 ```
 
 The script expects the data to be stored using the following file and directory naming convention:
