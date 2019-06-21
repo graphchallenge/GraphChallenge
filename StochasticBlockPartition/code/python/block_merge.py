@@ -12,10 +12,12 @@ from partition_baseline_support import compute_delta_entropy
 from partition_baseline_support import carry_out_best_merges
 
 from partition import Partition
+from evaluation import Evaluation
+from block_merge_timings import BlockMergeTimings
 
 
 def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_sparse_matrix: bool,
-    out_neighbors: np.array) -> Partition:
+    out_neighbors: np.array, evaluation: Evaluation) -> Partition:
     """The block merge portion of the algorithm.
 
         Parameters:
@@ -28,33 +30,48 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
                 if True, then use the slower but smaller sparse matrix representation to store matrices
         out_neighbors : np.array
                 the matrix representing neighboring blocks
+        evaluation : Evaluation
+                stores the evaluation metrics
 
         Returns:
         -------
         partition : Partition
                 the updated partition
     """
+    block_merge_timings = evaluation.add_block_merge_timings()
+
+    block_merge_timings.t_initialization()
     best_merge_for_each_block = np.ones(partition.num_blocks, dtype=int) * -1  # initialize to no merge
     delta_entropy_for_each_block = np.ones(partition.num_blocks) * np.Inf  # initialize criterion
     block_partition = range(partition.num_blocks)
+    block_merge_timings.t_initialization()
+
     for current_block in range(partition.num_blocks):  # evaluate agglomerative updates for each block
         for _ in range(num_agg_proposals_per_block):
-            proposal, delta_entropy = propose_merge(current_block, partition, use_sparse_matrix, block_partition)
+            proposal, delta_entropy = propose_merge(current_block, partition, use_sparse_matrix, block_partition,
+                                                    block_merge_timings)
+            block_merge_timings.t_acceptance()
             if delta_entropy < delta_entropy_for_each_block[current_block]:  # a better block candidate was found
                 best_merge_for_each_block[current_block] = proposal
                 delta_entropy_for_each_block[current_block] = delta_entropy
+            block_merge_timings.t_acceptance()
 
     # carry out the best merges
+    block_merge_timings.t_merging()
     partition = carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_block, partition)
+    block_merge_timings.t_merging()
 
     # re-initialize edge counts and block degrees
+    block_merge_timings.t_re_counting_edges()
     partition.initialize_edge_counts(out_neighbors, use_sparse_matrix)
+    block_merge_timings.t_re_counting_edges()
     
     return partition
 # End of merge_blocks()
 
 
-def propose_merge(current_block: int, partition: Partition, use_sparse_matrix: bool, block_partition: np.array) -> Tuple[int, float]:
+def propose_merge(current_block: int, partition: Partition, use_sparse_matrix: bool, block_partition: np.array,
+    block_merge_timings: BlockMergeTimings) -> Tuple[int, float]:
     """Propose a block merge, and calculate its delta entropy value.
 
         Parameters
@@ -67,6 +84,8 @@ def propose_merge(current_block: int, partition: Partition, use_sparse_matrix: b
                 if True, the interblock edge count matrix is stored using a slower sparse representation
         block_partition : np.array [int]
                 the current block assignment for every block
+        block_merge_timings : BlockMergeTimings
+                stores the timing details of the block merge step
 
         Returns
         -------
@@ -76,31 +95,41 @@ def propose_merge(current_block: int, partition: Partition, use_sparse_matrix: b
                 the delta entropy of the proposed merge
     """
     # populate edges to neighboring blocks
+    block_merge_timings.t_indexing()
     out_blocks = outgoing_edges(partition.interblock_edge_count, current_block, use_sparse_matrix)
     in_blocks = incoming_edges(partition.interblock_edge_count, current_block, use_sparse_matrix)
+    block_merge_timings.t_indexing()
 
     # propose a new block to merge with
+    block_merge_timings.t_proposal()
     proposal, num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges = propose_new_partition(
         current_block, out_blocks, in_blocks, block_partition, partition, True, use_sparse_matrix)
+    block_merge_timings.t_proposal()
 
     # compute the two new rows and columns of the interblock edge count matrix
+    block_merge_timings.t_edge_count_updates()
     edge_count_updates = compute_new_rows_cols_interblock_edge_count_matrix(partition.interblock_edge_count, current_block, proposal,
                                                         out_blocks[:, 0], out_blocks[:, 1], in_blocks[:, 0],
                                                         in_blocks[:, 1],
                                                         partition.interblock_edge_count[current_block, current_block],
                                                         1, use_sparse_matrix)
+    block_merge_timings.t_edge_count_updates()
 
     # compute new block degrees
+    block_merge_timings.t_block_degree_updates()
     block_degrees_out_new, block_degrees_in_new, block_degrees_new = compute_new_block_degrees(current_block,
                                                                                             proposal,
                                                                                             partition,
                                                                                             num_out_neighbor_edges,
                                                                                             num_in_neighbor_edges,
                                                                                             num_neighbor_edges)
+    block_merge_timings.t_block_degree_updates()
 
     # compute change in entropy / posterior
+    block_merge_timings.t_compute_delta_entropy()
     delta_entropy = compute_delta_entropy(current_block, proposal, partition, edge_count_updates, 
                                         block_degrees_out_new, block_degrees_in_new, use_sparse_matrix)
+    block_merge_timings.t_compute_delta_entropy()
     return proposal, delta_entropy
 # End of propose_merge()
 

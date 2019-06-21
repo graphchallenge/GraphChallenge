@@ -3,11 +3,13 @@
 
 import os
 import sys
-from typing import List, Optional
+from typing import List, Optional, Tuple, Dict
 import argparse
 
 import numpy as np
 import pandas as pd
+
+from sample import Sample
 
 
 class Graph():
@@ -77,6 +79,30 @@ class Graph():
             graph = _load_graph(input_filename, load_true_partition=True)
         return graph
     # End of load()
+
+    def sample(self, args: argparse.Namespace) -> Tuple['Graph', Dict[int,int], Dict[int,int]]:
+        """Sample a set of vertices from the graph.
+
+            Parameters
+            ----------
+            args : Namespace
+                    the parsed command-line arguments
+            
+            Returns
+            ------
+            subgraph : Graph
+                    the subgraph created from the sampled Graph vertices
+            vertex_mapping : Dict[int,int]
+                    the mapping of vertex ids in full graph to vertex ids in subgraph
+            true_blocks_mapping : Dict[int,int]
+                    the mapping of block ids in full graph to block ids in subgraph
+        """
+        sample = Sample.create_sample(self.num_nodes, self.out_neighbors, self.in_neighbors, self.true_block_assignment,
+                                      args)
+        subgraph = Graph(sample.out_neighbors, sample.in_neighbors, sample.sample_num, sample.num_edges,
+                         sample.true_block_assignment)
+        return subgraph, sample.vertex_mapping, sample.true_blocks_mapping
+    # End of sample()
 # End of Graph()
 
 

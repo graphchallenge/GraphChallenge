@@ -95,19 +95,14 @@ def propose_new_partition(r, neighbors_out, neighbors_in, b, partition: Partitio
     k_out = sum(neighbors_out[:,1])
     k_in = sum(neighbors_in[:,1])
     k = k_out + k_in
-    if k==0: # this node has no neighbor, simply propose a block randomly
-        s = np.random.randint(partition.num_blocks)
+    if k == 0: # this node has no neighbor, simply propose a block randomly
+        s = propose_random_block(r, partition.num_blocks, agg_move)
         return s, k_out, k_in, k
     rand_neighbor = np.random.choice(neighbors[:,0], p=neighbors[:,1]/float(k))
     u = b[rand_neighbor]
     # propose a new block randomly
     if np.random.uniform() <= partition.num_blocks/float(partition.block_degrees[u]+partition.num_blocks):  # chance inversely prop. to block_degree
-        if agg_move:  # force proposal to be different from current block
-            candidates = set(range(partition.num_blocks))
-            candidates.discard(r)
-            s = np.random.choice(list(candidates))
-        else:
-            s = np.random.randint(partition.num_blocks)
+        s = propose_random_block(r, partition.num_blocks, agg_move)
     else:  # propose by random draw from neighbors of block partition[rand_neighbor]
         if use_sparse:
             multinomial_prob = (partition.interblock_edge_count[u, :].toarray().transpose() + partition.interblock_edge_count[:, u].toarray()) / float(partition.block_degrees[u])
@@ -125,6 +120,34 @@ def propose_new_partition(r, neighbors_out, neighbors_in, b, partition: Partitio
         candidates = multinomial_prob.nonzero()[0]
         s = candidates[np.flatnonzero(np.random.multinomial(1, multinomial_prob[candidates].ravel()))[0]]
     return s, k_out, k_in, k
+
+
+def propose_random_block(current_block: int, num_blocks: int, agg_move: bool) -> int:
+    """Proposes a random new block membership for the current node. If this is done during the block_merge step, 
+    ensures that the proposed block != current block.
+
+        Parameters
+        ----------
+        current_block : int
+                    the current block membership
+        num_blocks : int
+                    the number of blocks in the current partition
+        agg_move : bool
+                    true if the current algorithm step is block merge (agglomerative partitioning)
+        
+        Returns
+        -------
+        proposed_block : int
+                    the proposed block membership
+    """
+    if agg_move:  # force proposal to be different from current block
+        candidates = set(range(num_blocks))
+        candidates.discard(current_block)
+        proposed_block = np.random.choice(list(candidates))
+    else:
+        proposed_block = np.random.randint(num_blocks)
+    return proposed_block
+# End of propose_random_block()
 
 
 def compute_new_rows_cols_interblock_edge_count_matrix(M, r, s, b_out, count_out, b_in, count_in, count_self,
