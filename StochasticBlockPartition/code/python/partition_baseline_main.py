@@ -70,6 +70,8 @@ def parse_arguments():
                         choices=["uniform_random", "random_walk", "random_jump", "degree_weighted",
                                  "random_node_neighbor", "forest_fire", "none"],
                         help="""Sampling algorithm to use. Default = none""")
+    parser.add_argument("--sample_iterations", type=int, default=1,
+                        help="The number of sampling iterations to perform. Default = 1")
     args = parser.parse_args()
     return args
 # End of parse_arguments()
@@ -139,47 +141,57 @@ if __name__ == "__main__":
     visualize_graph = False  # whether to plot the graph layout colored with intermediate partitions
 
     t_start = timeit.default_timer()
-    
+
+    ## For num_iterations
+    ##     samples.append(sample graph)
+    ## partition sample
+    ## For num_iterations
+    ##     extend sample results
+    ##     finetune sample results
+    ## Evaluate innermost sample
+    ## Evaluate results
+    graphs = list()
     if args.sample_type != "none":
         full_graph = Graph.load(args)
-        t_load = timeit.default_timer()    
-        graph, mapping, block_assignment_mapping = full_graph.sample(args)
+        t_load = timeit.default_timer()
+        for _ in args.sample_iterations:
+            graph, mapping, block_assignment_mapping = full_graph.sample(args)
+            graphs.append((graph, mapping, block_assignment_mapping))
         t_sample = timeit.default_timer()
-        print("Performing stochastic block partitioning on sampled subgraph")
+        print("Performing stochastic block partitioning on sampled subgraph after {} sampling iterations".format(
+            args.sample_iterations
+        ))
+        partition, evaluation = stochastic_block_partition(graphs[-1][0], args)
     else:
         graph = Graph.load(args)
         t_load = timeit.default_timer()
         t_sample = timeit.default_timer()
         print("Performing stochastic block partitioning")
-
-    if args.verbose:
-        print('Number of nodes: {}'.format(graph.num_nodes))
-        print('Number of edges: {}'.format(graph.num_edges))
-
-    # begin partitioning by finding the best partition with the optimal number of blocks
-    partition, evaluation = stochastic_block_partition(graph, args)
+        # begin partitioning by finding the best partition with the optimal number of blocks
+        partition, evaluation = stochastic_block_partition(graph, args)
 
     if args.sample_type != "none":
         print('Combining sampled partition with full graph')
-        t_start_merge_sample = timeit.default_timer()
-        full_graph_partition = Partition(full_graph.num_nodes, full_graph.out_neighbors, args)
-        full_graph_partition.block_assignment = np.full(full_graph_partition.block_assignment.shape, -1)
-        for key, value in mapping.items():
-            full_graph_partition.block_assignment[key] = partition.block_assignment[value]
-        next_block = partition.num_blocks
-        for vertex in range(full_graph.num_nodes):
-            if full_graph_partition.block_assignment[vertex] == -1:
-                full_graph_partition.block_assignment[vertex] = next_block
-                next_block += 1
-        full_graph_partition.num_blocks = next_block
-        full_graph_partition.initialize_edge_counts(full_graph.out_neighbors, args.sparse)
-        t_merge_sample = timeit.default_timer()
+        for i in range(args.sample_iterations-2, 0, -1):
+            t_start_merge_sample = timeit.default_timer()
+            full_graph_partition = Partition(full_graph.num_nodes, full_graph.out_neighbors, args)
+            full_graph_partition.block_assignment = np.full(full_graph_partition.block_assignment.shape, -1)
+            for key, value in mapping.items():
+                full_graph_partition.block_assignment[key] = partition.block_assignment[value]
+            next_block = partition.num_blocks
+            for vertex in range(full_graph.num_nodes):
+                if full_graph_partition.block_assignment[vertex] == -1:
+                    full_graph_partition.block_assignment[vertex] = next_block
+                    next_block += 1
+            full_graph_partition.num_blocks = next_block
+            full_graph_partition.initialize_edge_counts(full_graph.out_neighbors, args.sparse)
+            t_merge_sample = timeit.default_timer()
 
-        full_graph_partition = propagate_membership(full_graph, full_graph_partition, partition, args)
-        t_propagate_membership = timeit.default_timer()
+            full_graph_partition = propagate_membership(full_graph, full_graph_partition, partition, args)
+            t_propagate_membership = timeit.default_timer()
 
-        full_graph_partition = fine_tune_membership(full_graph_partition, full_graph, evaluation, args)
-        t_fine_tune_membership = timeit.default_timer()
+            full_graph_partition = fine_tune_membership(full_graph_partition, full_graph, evaluation, args)
+            t_fine_tune_membership = timeit.default_timer()
 
     t_end = timeit.default_timer()
     print('\nGraph partition took {} seconds'.format(t_end - t_start))
