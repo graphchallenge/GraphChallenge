@@ -77,6 +77,10 @@ class Graph():
                 graph.update(_load_graph(input_filename, load_true_partition=False, part_num=part, graph=graph))
         else:
             graph = _load_graph(input_filename, load_true_partition=True)
+
+        if args.verbose:
+            print('Number of nodes: {}'.format(graph.num_nodes))
+            print('Number of edges: {}'.format(graph.num_edges))
         return graph
     # End of load()
 
