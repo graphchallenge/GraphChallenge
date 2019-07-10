@@ -70,6 +70,7 @@ def parse_arguments():
                         choices=["uniform_random", "random_walk", "random_jump", "degree_weighted",
                                  "random_node_neighbor", "forest_fire", "none"],
                         help="""Sampling algorithm to use. Default = none""")
+    parser.add_argument("--degrees", action="store_true", help="Save vertex degrees and exit.")
     args = parser.parse_args()
     return args
 # End of parse_arguments()
