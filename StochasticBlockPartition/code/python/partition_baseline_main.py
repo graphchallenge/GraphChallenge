@@ -162,21 +162,23 @@ if __name__ == "__main__":
 
     if args.sample_type != "none":
         print('Combining sampled partition with full graph')
-        t_start_merge_sample = timeit.default_timer()
-        full_graph_partition = Partition(full_graph.num_nodes, full_graph.out_neighbors, args)
-        full_graph_partition.block_assignment = np.full(full_graph_partition.block_assignment.shape, -1)
-        for key, value in mapping.items():
-            full_graph_partition.block_assignment[key] = partition.block_assignment[value]
-        next_block = partition.num_blocks
-        for vertex in range(full_graph.num_nodes):
-            if full_graph_partition.block_assignment[vertex] == -1:
-                full_graph_partition.block_assignment[vertex] = next_block
-                next_block += 1
-        full_graph_partition.num_blocks = next_block
-        full_graph_partition.initialize_edge_counts(full_graph.out_neighbors, args.sparse)
-        t_merge_sample = timeit.default_timer()
+        t_start_propagate_membership = timeit.default_timer()
+        full_graph_partition = Partition.from_sample(partition.num_blocks, full_graph.out_neighbors,
+                                                     partition.block_assignment, mapping, args)
+        # full_graph_partition = Partition(full_graph.num_nodes, full_graph.out_neighbors, args)
+        # full_graph_partition.block_assignment = np.full(full_graph_partition.block_assignment.shape, -1)
+        # for key, value in mapping.items():
+        #     full_graph_partition.block_assignment[key] = partition.block_assignment[value]
+        # next_block = partition.num_blocks
+        # for vertex in range(full_graph.num_nodes):
+        #     if full_graph_partition.block_assignment[vertex] == -1:
+        #         full_graph_partition.block_assignment[vertex] = next_block
+        #         next_block += 1
+        # full_graph_partition.num_blocks = next_block
+        # full_graph_partition.initialize_edge_counts(full_graph.out_neighbors, args.sparse)
+        # t_merge_sample = timeit.default_timer()
 
-        full_graph_partition = propagate_membership(full_graph, full_graph_partition, partition, args)
+        # full_graph_partition = propagate_membership(full_graph, full_graph_partition, partition, args)
         t_propagate_membership = timeit.default_timer()
 
         full_graph_partition = fine_tune_membership(full_graph_partition, full_graph, evaluation, args)
@@ -194,8 +196,8 @@ if __name__ == "__main__":
                                               block_assignment_mapping)
         evaluation.num_nodes = full_graph.num_nodes
         evaluation.num_edges = full_graph.num_edges
-        evaluation.merge_sample = t_merge_sample - t_start_merge_sample
-        evaluation.propagate_membership = t_propagate_membership - t_merge_sample
+        # evaluation.merge_sample = t_merge_sample - t_start_merge_sample
+        evaluation.propagate_membership = t_propagate_membership - t_start_propagate_membership
         evaluation.finetune_membership = t_fine_tune_membership - t_propagate_membership
 
         # evaluate output partition against the true partition
