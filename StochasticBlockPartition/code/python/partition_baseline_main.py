@@ -16,6 +16,7 @@ from node_reassignment import reassign_nodes, propagate_membership, fine_tune_me
 from graph import Graph
 from evaluate import evaluate_partition, evaluate_subgraph_partition
 from evaluation import Evaluation
+from samplestack import SampleStack
 
 
 def parse_arguments():
@@ -72,6 +73,7 @@ def parse_arguments():
                         help="""Sampling algorithm to use. Default = none""")
     parser.add_argument("--sample_iterations", type=int, default=1,
                         help="The number of sampling iterations to perform. Default = 1")
+    parser.add_argument("--degrees", action="store_true", help="Save vertex degrees and exit.")
     args = parser.parse_args()
     return args
 # End of parse_arguments()
@@ -142,26 +144,17 @@ if __name__ == "__main__":
 
     t_start = timeit.default_timer()
 
-    ## For num_iterations
-    ##     samples.append(sample graph)
-    ## partition sample
-    ## For num_iterations
-    ##     extend sample results
-    ##     finetune sample results
-    ## Evaluate innermost sample
-    ## Evaluate results
-    graphs = list()
     if args.sample_type != "none":
-        full_graph = Graph.load(args)
-        t_load = timeit.default_timer()
-        for _ in args.sample_iterations:
-            graph, mapping, block_assignment_mapping = full_graph.sample(args)
-            graphs.append((graph, mapping, block_assignment_mapping))
-        t_sample = timeit.default_timer()
+        samplestack = SampleStack(args)
+        graph, vertex_mapping, block_mapping = samplestack.tail()
+        # full_graph = Graph.load(args)
+        # t_load = timeit.default_timer()
+        # graph, mapping, block_assignment_mapping = full_graph.sample(args)
+        # t_sample = timeit.default_timer()
         print("Performing stochastic block partitioning on sampled subgraph after {} sampling iterations".format(
             args.sample_iterations
         ))
-        partition, evaluation = stochastic_block_partition(graphs[-1][0], args)
+        partition, evaluation = stochastic_block_partition(graph, args)
     else:
         graph = Graph.load(args)
         t_load = timeit.default_timer()
@@ -172,42 +165,45 @@ if __name__ == "__main__":
 
     if args.sample_type != "none":
         print('Combining sampled partition with full graph')
-        for i in range(args.sample_iterations-2, 0, -1):
-            t_start_merge_sample = timeit.default_timer()
-            full_graph_partition = Partition(full_graph.num_nodes, full_graph.out_neighbors, args)
-            full_graph_partition.block_assignment = np.full(full_graph_partition.block_assignment.shape, -1)
-            for key, value in mapping.items():
-                full_graph_partition.block_assignment[key] = partition.block_assignment[value]
-            next_block = partition.num_blocks
-            for vertex in range(full_graph.num_nodes):
-                if full_graph_partition.block_assignment[vertex] == -1:
-                    full_graph_partition.block_assignment[vertex] = next_block
-                    next_block += 1
-            full_graph_partition.num_blocks = next_block
-            full_graph_partition.initialize_edge_counts(full_graph.out_neighbors, args.sparse)
-            t_merge_sample = timeit.default_timer()
+        full_graph, full_graph_partition, _ = samplestack.unstack(partition, args, evaluation)
+        # for i in range(args.sample_iterations-2, 0, -1):
+        #     t_start_propagate_membership = timeit.default_timer()
+        #     full_graph_partition = Partition.from_sample(partition.num_blocks, full_graph.out_neighbors,
+        #                                                 partition.block_assignment, mapping, args)
+            # full_graph_partition = Partition(full_graph.num_nodes, full_graph.out_neighbors, args)
+            # full_graph_partition.block_assignment = np.full(full_graph_partition.block_assignment.shape, -1)
+            # for key, value in mapping.items():
+            #     full_graph_partition.block_assignment[key] = partition.block_assignment[value]
+            # next_block = partition.num_blocks
+            # for vertex in range(full_graph.num_nodes):
+            #     if full_graph_partition.block_assignment[vertex] == -1:
+            #         full_graph_partition.block_assignment[vertex] = next_block
+            #         next_block += 1
+            # full_graph_partition.num_blocks = next_block
+            # full_graph_partition.initialize_edge_counts(full_graph.out_neighbors, args.sparse)
+            # t_merge_sample = timeit.default_timer()
 
-            full_graph_partition = propagate_membership(full_graph, full_graph_partition, partition, args)
-            t_propagate_membership = timeit.default_timer()
+            # full_graph_partition = propagate_membership(full_graph, full_graph_partition, partition, args)
+            # t_propagate_membership = timeit.default_timer()
 
-            full_graph_partition = fine_tune_membership(full_graph_partition, full_graph, evaluation, args)
-            t_fine_tune_membership = timeit.default_timer()
+            # full_graph_partition = fine_tune_membership(full_graph_partition, full_graph, evaluation, args)
+            # t_fine_tune_membership = timeit.default_timer()
 
     t_end = timeit.default_timer()
     print('\nGraph partition took {} seconds'.format(t_end - t_start))
 
     evaluation.total_runtime(t_start, t_end)
-    evaluation.loading = t_load - t_start
-    evaluation.sampling = t_sample - t_load
+    # evaluation.loading = t_load - t_start
+    # evaluation.sampling = t_sample - t_load
 
     if args.sample_type != "none":
         evaluation.evaluate_subgraph_sampling(full_graph, graph, full_graph_partition, partition,
-                                              block_assignment_mapping)
+                                              block_mapping, vertex_mapping)
         evaluation.num_nodes = full_graph.num_nodes
         evaluation.num_edges = full_graph.num_edges
-        evaluation.merge_sample = t_merge_sample - t_start_merge_sample
-        evaluation.propagate_membership = t_propagate_membership - t_merge_sample
-        evaluation.finetune_membership = t_fine_tune_membership - t_propagate_membership
+        # evaluation.merge_sample = t_merge_sample - t_start_merge_sample
+        # evaluation.propagate_membership = t_propagate_membership - t_start_propagate_membership
+        # evaluation.finetune_membership = t_fine_tune_membership - t_propagate_membership
 
         # evaluate output partition against the true partition
         evaluate_subgraph_partition(graph.true_block_assignment, partition.block_assignment, evaluation)

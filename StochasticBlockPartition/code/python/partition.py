@@ -2,7 +2,7 @@
 """
 
 from collections import namedtuple
-from typing import List
+from typing import List, Dict
 from argparse import Namespace
 
 import numpy as np
@@ -14,7 +14,8 @@ class Partition():
     """Stores the current partitioning results.
     """
 
-    def __init__(self, num_blocks: int, out_neighbors: List[np.ndarray], args: Namespace) -> None:
+    def __init__(self, num_blocks: int, out_neighbors: List[np.ndarray], args: Namespace,
+        block_assignment: np.ndarray = None) -> None:
         """Creates a new Partition object.
 
             Parameters
@@ -25,9 +26,14 @@ class Partition():
                     list of outgoing edges for each node
             args : Namespace
                     the command-line arguments
+            block_assignment : np.ndarray [int]
+                    the provided block assignment. Default = None
         """
         self.num_blocks = num_blocks
-        self.block_assignment = np.array(range(num_blocks))
+        if block_assignment is None:
+            self.block_assignment = np.array(range(num_blocks))
+        else:
+            self.block_assignment = block_assignment
         self.overall_entropy = np.inf
         self.interblock_edge_count = [[]]  # type: np.array
         self.block_degrees = np.zeros(num_blocks)
@@ -107,6 +113,50 @@ class Partition():
         partition.initialize_edge_counts(out_neighbors, self._args.sparse)
         return partition
     # End of clone_with_true_block_membership()
+
+    @staticmethod
+    def from_sample(num_blocks: int, out_neighbors: List[np.ndarray],
+        sample_block_assignment: np.ndarray, mapping: Dict[int,int], args: 'argparse.Namespace') -> 'Partition':
+        """Creates a new Partition object from the block assignment array.
+
+            Parameters
+            ----------
+            num_blocks : int
+                    the number of blocks in the current partition
+            out_neighbors : List[np.ndarray]
+                    list of outgoing edges for each node
+            sample_block_assignment : np.ndarray [int]
+                    the partitioning results on the sample
+            mapping : Dict[int,int]
+                    the mapping of sample vertex indices to full graph vertex indices
+            args : argparse.Namespace
+                    the command-line args passed to the program
+
+            Returns
+            -------
+            partition : Partition
+                    the partition created from the sample
+        """
+        block_assignment = np.full(len(out_neighbors), -1)
+        for key, value in mapping.items():
+            block_assignment[key] = sample_block_assignment[value]
+        next_block = num_blocks
+        for vertex in range(len(out_neighbors)):
+            if block_assignment[vertex] == -1:
+                block_assignment[vertex] = next_block
+                next_block += 1
+        for vertex in range(len(out_neighbors)):
+            if block_assignment[vertex] >= num_blocks:
+                # count links to each block
+                block_counts = np.zeros(num_blocks)
+                for neighbor in out_neighbors[vertex]:
+                    neighbor_block = block_assignment[neighbor[0]]
+                    if neighbor_block < num_blocks:
+                        block_counts[neighbor_block] += 1
+                # pick block with max link
+                block_assignment[vertex] = np.argmax(block_counts)
+        return Partition(num_blocks, out_neighbors, args, block_assignment)
+    # End of from_sample()
 
 
 class PartitionTriplet():

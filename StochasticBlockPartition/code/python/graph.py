@@ -5,6 +5,7 @@ import os
 import sys
 from typing import List, Optional, Tuple, Dict
 import argparse
+import csv
 
 import numpy as np
 import pandas as pd
@@ -81,6 +82,8 @@ class Graph():
         if args.verbose:
             print('Number of nodes: {}'.format(graph.num_nodes))
             print('Number of edges: {}'.format(graph.num_edges))
+        if args.degrees:
+            _save_degree_distribution(args, graph.out_neighbors, graph.in_neighbors)
         return graph
     # End of load()
 
@@ -217,3 +220,37 @@ def _load_graph(input_filename: str, load_true_partition: bool, part_num: Option
     else:
         return Graph(out_neighbors, in_neighbors, N, E)
 # End of load_graph()
+
+
+def _save_degree_distribution(args: argparse.Namespace, out_neighbors: List[np.ndarray],
+    in_neighbors: List[np.ndarray]):
+    """Saves the in and out degrees of all vertices in the graph.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        the command-line arguments provided
+    out_neighbors : List[np.ndarray]
+        the outgoing edges from each node
+    in_neighbors : List[np.ndarray]
+        the incoming edges to each node
+    """
+    write_header = False
+    if not os.path.isfile(args.csv + ".csv"):
+        directory = os.path.dirname(args.csv + ".csv")
+        if directory not in [".", ""]:
+            os.makedirs(directory, exist_ok=True)
+        write_header = True
+    num_vertices = len(out_neighbors)
+    out_degrees = [len(neighbors) for neighbors in out_neighbors]
+    in_degrees = [len(neighbors) for neighbors in in_neighbors]
+    with open(args.csv + ".csv", "a") as details_file:
+        writer = csv.writer(details_file)
+        if write_header:
+            writer.writerow(["Num Vertices", "In/Out", "Degree"])
+        for degree in out_degrees:
+            writer.writerow([num_vertices, "Out", degree])
+        for degree in in_degrees:
+            writer.writerow([num_vertices, "In", degree])
+    exit()
+# End of _save_degree_distribution()
