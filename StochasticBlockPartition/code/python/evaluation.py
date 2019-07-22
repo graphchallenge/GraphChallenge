@@ -28,6 +28,8 @@ class Evaluation(object):
         'difference in within to between edge ratios',
         'difference from ideal sample',
         'expansion quality',
+        'subgraph clustering coefficient',
+        'full graph clustering coefficient',
         'subgraph num blocks in algorithm partition',
         'subgraph num blocks in truth partition',
         'subgraph accuracy',
@@ -113,6 +115,8 @@ class Evaluation(object):
         self.edge_ratio_diff = 0.0
         self.difference_from_ideal_sample = 0.0
         self.expansion_quality = 0.0
+        self.subgraph_clustering_coefficient = 0.0
+        self.full_graph_clustering_coefficient = 0.0
         self.subgraph_num_blocks_algorithm = 0
         self.subgraph_num_blocks_truth = 0
         self.subgraph_accuracy = 0.0
@@ -243,6 +247,12 @@ class Evaluation(object):
                 neighbors.add(neighbor[0])
         neighbors = neighbors - subgraph_vertices
         self.expansion_quality = len(neighbors) / (full_graph.num_nodes - subgraph.num_nodes)
+
+        ######
+        # Clustering coefficient
+        ######
+        self.subgraph_clustering_coefficient = self.clustering_coefficient(subgraph)
+        self.full_graph_clustering_coefficient = self.clustering_coefficient(full_graph)
     # End of evaluate_subgraph_sampling()
 
     def update_timings(self, block_merge_start_t: float, node_update_start_t: float, prepare_next_start_t: float,
@@ -283,6 +293,33 @@ class Evaluation(object):
         self.total_partition_time = runtime
     # End of total_runtime()
 
+    def clustering_coefficient(self, graph: Graph) -> float:
+        """Calculates the clustering coefficient of a given graph.
+
+        Clustering coefficient = number of closed triangles / total possible number of triangles.
+
+        Current version also counts self-connections as triangles as well.
+
+            Parameters
+            ---------
+            graph : Graph
+                the graph whose clustering coefficient is of interest
+            
+            Returns
+            -------
+            clustering_coefficient : float
+                the clustering coefficient of said graph
+        """
+        n_triangles_sample = 0
+        for vertex in range(graph.num_nodes):
+            for neighbor in graph.out_neighbors[vertex]:
+                for neighbor2 in graph.out_neighbors[vertex]:
+                    # TODO: If not counting self-links, add check for that here
+                    if neighbor2[0] in graph.out_neighbors[neighbor[0]]:
+                        n_triangles_sample += 1
+        return n_triangles_sample / (graph.num_nodes * (graph.num_nodes - 1))
+    # End of clustering_coefficient()
+
     def save(self):
         """Saves the evaluation to a CSV file. Creates a new CSV file one the path of csv_file doesn't exist. Appends
         results to the CSV file if it does.
@@ -307,6 +344,8 @@ class Evaluation(object):
                 self.edge_ratio_diff,
                 self.difference_from_ideal_sample,
                 self.expansion_quality,
+                self.subgraph_clustering_coefficient,
+                self.full_graph_clustering_coefficient,
                 self.subgraph_num_blocks_algorithm,
                 self.subgraph_num_blocks_truth,
                 self.subgraph_accuracy,
