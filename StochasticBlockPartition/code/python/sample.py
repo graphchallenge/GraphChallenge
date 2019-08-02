@@ -1,7 +1,7 @@
 """Helper functions for performing different kinds of sampling.
 """
 
-from typing import List, Dict
+from typing import List, Dict, Tuple
 from copy import copy
 
 import numpy as np
@@ -67,6 +67,9 @@ class Sample():
         elif args.sample_type == "forest_fire":
             return Sample.forest_fire_sample(num_vertices, old_out_neighbors, old_in_neighbors,
                                              old_true_block_assignment, args)
+        elif args.sample_type == "expansion_snowball":
+            return Sample.expansion_snowball_sample(num_vertices, old_out_neighbors, old_in_neighbors,
+                                                    old_true_block_assignment, args)
         else:
             raise NotImplementedError("Sample type: {} is not implemented!".format(args.sample_type))
     # End of create_sample()
@@ -239,4 +242,86 @@ class Sample():
                 next_fire_front = list()
         sample_idx = np.asarray(index_set[:sample_num])
         return Sample(sample_idx, old_out_neighbors, old_in_neighbors, old_true_block_assignment)
-    # End of random_node_neighbor_sample()
+    # End of forest_fire_sample()
+
+    @staticmethod
+    def expansion_snowball_sample(num_vertices: int, old_out_neighbors: List[np.ndarray],
+        old_in_neighbors: List[np.ndarray], old_true_block_assignment: np.ndarray,
+        args: 'argparse.Namespace') -> 'Sample':
+        """Expansion snowball sampling. At every iterations, picks a node adjacent to the current sample that
+        contributes the most new neighbors.
+        """
+        sample_num = int(num_vertices * (args.sample_size / 100))
+        print("Sampling {} vertices from graph".format(sample_num))
+        start = np.random.randint(num_vertices)
+        index_flag = [False] * num_vertices
+        index_flag[start] = True
+        index_set = [start]
+
+        neighbors = list(old_out_neighbors[start][:,0])
+        # Set up the initial contributions counts and flag currently neighboring vertices
+        neighbors_flag = [False] * num_vertices
+        contribution = [0] * num_vertices
+        for neighbor in old_out_neighbors[start][:,0]:
+            neighbors_flag[neighbor] = True
+            new_neighbors = 0
+            for _neighbor in old_out_neighbors[neighbor][:,0]:
+                if not (index_flag[_neighbor] or neighbors_flag[_neighbor]): new_neighbors += 1
+            contribution[neighbor] += new_neighbors
+        while len(index_set) < sample_num:
+            if len(neighbors) == 0:
+                vertex = np.random.randint(num_vertices)
+                if index_flag[vertex]:
+                    continue
+                index_set.append(vertex)
+                for neighbor in old_out_neighbors[start][:,0]:
+                    if not neighbors_flag[neighbor]:
+                        Sample._add_neighbor(neighbor, contribution, index_flag, neighbors_flag,
+                                             old_out_neighbors[neighbor][:,0], old_in_neighbors[neighbor][:,0],
+                                             neighbors)
+                continue
+            vertex = np.argmax(contribution)
+            index_set.append(vertex)
+            index_flag[vertex] = True
+            neighbors.remove(vertex)
+            contribution[vertex] = 0
+            for neighbor in old_in_neighbors[vertex][:,0]:
+                if not neighbors_flag[neighbor]:
+                    Sample._add_neighbor(neighbor, contribution, index_flag, neighbors_flag,
+                                         old_out_neighbors[neighbor][:,0], old_in_neighbors[neighbor][:,0], neighbors)
+        sample_idx = np.asarray(index_set)
+        return Sample(sample_idx, old_out_neighbors, old_in_neighbors, old_true_block_assignment)
+    # End of expansion_snowball_sample()
+
+    @staticmethod
+    def _add_neighbor(vertex: int, contribution: List[int], index_flag: List[bool], neighbor_flag: List[bool],
+        out_neighbors: np.ndarray, in_neighbors: np.ndarray, neighbors: List[int]) -> Tuple[List[int], List[bool]]:
+        """Updates the expansion contribution for neighbors of a single vertex.
+        """
+        neighbors.append(vertex)
+        neighbor_flag[vertex] = True
+        if contribution[vertex] == 0:
+            Sample._calculate_contribution(vertex, contribution, index_flag, neighbor_flag, out_neighbors, in_neighbors)
+        # # Compute contribution of this vertex
+        # for out_neighbor in out_neighbors:
+        #     if not (index_flag[out_neighbor] or neighbor_flag[out_neighbor]):
+        #         contribution[vertex] += 1
+        # # Decrease contribution of all neighbors with out links to this vertex
+        # for in_neighbor in in_neighbors:
+        #     if contribution[in_neighbor] > 0:
+        #         contribution[in_neighbor] -= 1
+        return contribution, neighbor_flag
+    # End of _add_neighbor()
+
+    @staticmethod
+    def _calculate_contribution(vertex: int, contribution: List[int], index_flag: List[bool], neighbor_flag: List[bool],
+        out_neighbors: np.ndarray, in_neighbors: np.ndarray):
+        # Compute contribution of this vertex
+        for out_neighbor in out_neighbors:
+            if not (index_flag[out_neighbor] or neighbor_flag[out_neighbor]):
+                contribution[vertex] += 1
+        # Decrease contribution of all neighbors with out links to this vertex
+        for in_neighbor in in_neighbors:
+            if contribution[in_neighbor] > 0:
+                contribution[in_neighbor] -= 1
+# End of Sample()

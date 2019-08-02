@@ -69,7 +69,7 @@ def parse_arguments():
                         help="The percent of total nodes to use as sample. Default = 100 (no sampling)")
     parser.add_argument("-m", "--sample_type", type=str, default="none", 
                         choices=["uniform_random", "random_walk", "random_jump", "degree_weighted",
-                                 "random_node_neighbor", "forest_fire", "none"],
+                                 "random_node_neighbor", "forest_fire", "expansion_snowball", "none"],
                         help="""Sampling algorithm to use. Default = none""")
     parser.add_argument("--sample_iterations", type=int, default=1,
                         help="The number of sampling iterations to perform. Default = 1")
