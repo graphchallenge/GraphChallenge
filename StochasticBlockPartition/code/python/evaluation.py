@@ -216,7 +216,7 @@ class Evaluation(object):
                                                                               full_graph.true_block_assignment)
         full_blockmatrix = true_full_partition.interblock_edge_count
         graph_edge_ratio = full_blockmatrix.trace() / full_blockmatrix.sum()
-        self.edge_ratio_diff = graph_edge_ratio / subgraph_edge_ratio
+        self.edge_ratio_diff = np.absolute(graph_edge_ratio - subgraph_edge_ratio)
 
         #####
         # Normalized difference from ideal-block membership
