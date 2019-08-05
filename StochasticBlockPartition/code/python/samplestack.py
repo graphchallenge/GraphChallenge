@@ -53,17 +53,27 @@ class SampleStack(object):
         subgraph_partition = partition
         _, vertex_mapping, block_mapping = self._pop()
         while len(self.stack) > 1:
+            t1 = timeit.default_timer()
             graph, _, _ = self.tail()
             subgraph_partition = Partition.from_sample(subgraph_partition.num_blocks, graph.out_neighbors,
                                                        subgraph_partition.block_assignment, vertex_mapping, args)
+            t2 = timeit.default_timer()
             subgraph_partition = fine_tune_membership(subgraph_partition, graph, evaluation, args)
             _, vertex_mapping, block_mapping = self._pop()
+            t3 = timeit.default_timer()
+            evaluation.propagate_membership += (t2 - t1)
+            evaluation.finetune_membership += (t3 - t2)
+        t1 = timeit.default_timer()
         full_graph, _, _ = self._pop()
         full_graph_partition = Partition.from_sample(subgraph_partition.num_blocks, full_graph.out_neighbors,
                                                      subgraph_partition.block_assignment, vertex_mapping, args)
+        t2 = timeit.default_timer()
         full_graph_partition = fine_tune_membership(full_graph_partition, full_graph, evaluation, args)
+        t3 = timeit.default_timer()
         evaluation.loading = self.t_load_end - self.t_load_start
         evaluation.sampling = self.t_sample_end - self.t_load_end
+        evaluation.propagate_membership += (t2 - t1)
+        evaluation.finetune_membership += (t3 - t2)
         return full_graph, full_graph_partition, block_mapping
     # End of unstack()
 
