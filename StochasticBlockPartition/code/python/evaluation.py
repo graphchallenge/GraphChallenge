@@ -25,11 +25,12 @@ class Evaluation(object):
         'num vertices',
         'num edges',
         'blocks retained (%)',
-        'difference in within to between edge ratios',
+        'within to between edge ratio',
         'difference from ideal sample',
         'expansion quality',
         'subgraph clustering coefficient',
         'full graph clustering coefficient',
+        'subgraph within to between edge ratio',
         'subgraph num blocks in algorithm partition',
         'subgraph num blocks in truth partition',
         'subgraph accuracy',
@@ -112,11 +113,12 @@ class Evaluation(object):
         self.num_edges = graph.num_edges
         # Sampling evaluation
         self.blocks_retained = 0.0
-        self.edge_ratio_diff = 0.0
+        self.graph_edge_ratio = 0.0
         self.difference_from_ideal_sample = 0.0
         self.expansion_quality = 0.0
         self.subgraph_clustering_coefficient = 0.0
         self.full_graph_clustering_coefficient = 0.0
+        self.subgraph_edge_ratio = 0.0
         self.subgraph_num_blocks_algorithm = 0
         self.subgraph_num_blocks_truth = 0
         self.subgraph_accuracy = 0.0
@@ -211,12 +213,11 @@ class Evaluation(object):
         true_subgraph_partition = subgraph_partition.clone_with_true_block_membership(subgraph.out_neighbors,
                                                                                       subgraph.true_block_assignment)
         subgraph_blockmatrix = true_subgraph_partition.interblock_edge_count
-        subgraph_edge_ratio = subgraph_blockmatrix.trace() / subgraph_blockmatrix.sum()
+        self.subgraph_edge_ratio = subgraph_blockmatrix.trace() / subgraph_blockmatrix.sum()
         true_full_partition = full_partition.clone_with_true_block_membership(full_graph.out_neighbors,
                                                                               full_graph.true_block_assignment)
         full_blockmatrix = true_full_partition.interblock_edge_count
-        graph_edge_ratio = full_blockmatrix.trace() / full_blockmatrix.sum()
-        self.edge_ratio_diff = np.absolute(graph_edge_ratio - subgraph_edge_ratio)
+        self.graph_edge_ratio = full_blockmatrix.trace() / full_blockmatrix.sum()
 
         #####
         # Normalized difference from ideal-block membership
@@ -341,11 +342,12 @@ class Evaluation(object):
                 self.num_nodes,
                 self.num_edges,
                 self.blocks_retained,
-                self.edge_ratio_diff,
+                self.graph_edge_ratio,
                 self.difference_from_ideal_sample,
                 self.expansion_quality,
                 self.subgraph_clustering_coefficient,
                 self.full_graph_clustering_coefficient,
+                self.subgraph_edge_ratio,
                 self.subgraph_num_blocks_algorithm,
                 self.subgraph_num_blocks_truth,
                 self.subgraph_accuracy,
