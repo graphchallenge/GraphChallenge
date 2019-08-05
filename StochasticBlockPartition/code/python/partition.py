@@ -107,10 +107,8 @@ class Partition():
             partition : Partition
                     the Partition when the partitioning is 100% accurate
         """
-        partition = Partition(len(true_block_membership), out_neighbors, self._args)
-        partition.block_assignment = true_block_membership
-        partition.num_blocks = len(np.unique(true_block_membership))
-        partition.initialize_edge_counts(out_neighbors, self._args.sparse)
+        num_blocks = len(np.unique(true_block_membership))
+        partition = Partition(num_blocks, out_neighbors, self._args, true_block_membership)
         return partition
     # End of clone_with_true_block_membership()
 
