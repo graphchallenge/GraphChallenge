@@ -86,6 +86,7 @@ def stochastic_block_partition(graph: Graph, args: argparse.Namespace) -> Tuple[
     evaluation = Evaluation(args, graph)
 
     partition = Partition(graph.num_nodes, graph.out_neighbors, args)
+    # print(partition.interblock_edge_count._matrix)
 
     # initialize items before iterations to find the partition with the optimal number of blocks
     partition_triplet = PartitionTriplet()

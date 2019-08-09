@@ -10,7 +10,8 @@
                Physical Review E 83, no. 1 (2011): 016107.
 """
 
-from typing import Tuple
+from typing import Tuple, Union
+import timeit
 
 import pandas as pd
 import numpy as np
@@ -20,6 +21,10 @@ if use_graph_tool_options:
     import graph_tool.all as gt
 
 from partition import Partition, PartitionTriplet
+from dictmatrix import DictMatrix
+
+
+Matrix = Union[np.ndarray, DictMatrix, sparse.lil_matrix]
 
 
 class EdgeCountUpdates(object):
@@ -192,7 +197,6 @@ def compute_new_rows_cols_interblock_edge_count_matrix(M, r, s, b_out, count_out
         -----
         The updates only involve changing the entries to and from the neighboring blocks
     """
-
     B = M.shape[0]
     if agg_move:  # the r row and column are simply empty after this merge move
         if use_sparse:
@@ -233,6 +237,44 @@ def compute_new_rows_cols_interblock_edge_count_matrix(M, r, s, b_out, count_out
 
     return EdgeCountUpdates(M_r_row, M_s_row, M_r_col, M_s_col)
 # End of compute_new_rows_cols_interblock_edge_count_matrix()
+
+
+def block_merge_edge_count_updates(M: Matrix, r: int, s: int, b_out: np.ndarray, count_out: np.ndarray,
+    b_in: np.ndarray, count_in: np.ndarray, count_self: int, use_sparse: bool) -> EdgeCountUpdates:
+    B = M.shape[0]
+    if use_sparse:
+        cs = 0
+        if count_self.values:
+            # print("There is a self-link!")
+            cs = count_self.values[0]
+        # print("============Issa sparse matrix yo!==============")
+        M_r_row = np.zeros(B)  # DictMatrix(shape=(1, B))
+        M_r_col = np.zeros(B)  # DictMatrix(shape=(B, 1))
+        M_s_row = M.getrow(s)  # M[s, :].to_matrix()  # .values  # type: IndexResult
+        M_s_col = M.getcol(s)  # [:, s].to_matrix()  # .values  # type: IndexResult
+        M_s_row[b_out] += count_out
+        M_s_row[r] -= (np.sum(count_in[np.where(b_in == s)]) + cs)
+        M_s_row[s] += (np.sum(count_in[np.where(b_in == s)]) + cs)
+        M_s_col[b_in] += count_in
+        M_s_col[r] -= (np.sum(count_out[np.where(b_out == s)]) + cs)
+        M_s_col[s] += (np.sum(count_out[np.where(b_out == s)]) + cs)
+    else:
+        M_r_row = np.zeros((1, B), dtype=int)
+        M_r_col = np.zeros((B, 1), dtype=int)
+        M_s_row = M[s, :].copy().reshape(1, B)
+        M_s_col = M[:, s].copy().reshape(B, 1)
+        M_s_row[0, b_out] += count_out
+        M_s_row[0, r] -= np.sum(count_in[np.where(b_in == s)])
+        M_s_row[0, s] += np.sum(count_in[np.where(b_in == s)])
+        M_s_row[0, r] -= count_self
+        M_s_row[0, s] += count_self
+        M_s_col[b_in, 0] += count_in.reshape(M_s_col[b_in, 0].shape)
+        M_s_col[r, 0] -= np.sum(count_out[np.where(b_out == s)])
+        M_s_col[s, 0] += np.sum(count_out[np.where(b_out == s)])
+        M_s_col[r, 0] -= count_self
+        M_s_col[s, 0] += count_self
+    return EdgeCountUpdates(M_r_row, M_s_row, M_r_col, M_s_col)
+# End of block_merge_edge_count_updates()
 
 
 def compute_new_block_degrees(r, s, partition: Partition, k_out, k_in, k):
@@ -398,23 +440,18 @@ def compute_delta_entropy(r, s, partition: Partition, edge_count_updates: EdgeCo
         where the sum runs over all entries $(t_1, t_2)$ in rows and cols $r$ and $s$ of the edge count matrix
     """
     if use_sparse: # computation in the sparse matrix is slow so convert to numpy arrays since operations are on only two rows and cols
-        M_r_row = edge_count_updates.block_row.toarray()
-        M_s_row = edge_count_updates.proposal_row.toarray()
-        M_r_col = edge_count_updates.block_col.toarray()
-        M_s_col = edge_count_updates.proposal_col.toarray()
-        M_r_t1 = partition.interblock_edge_count[r, :].toarray()
-        M_s_t1 = partition.interblock_edge_count[s, :].toarray()
-        M_t2_r = partition.interblock_edge_count[:, r].toarray()
-        M_t2_s = partition.interblock_edge_count[:, s].toarray()
-    else:
-        M_r_row = edge_count_updates.block_row
-        M_s_row = edge_count_updates.proposal_row
-        M_r_col = edge_count_updates.block_col
-        M_s_col = edge_count_updates.proposal_col
-        M_r_t1 = partition.interblock_edge_count[r, :]
-        M_s_t1 = partition.interblock_edge_count[s, :]
-        M_t2_r = partition.interblock_edge_count[:, r]
-        M_t2_s = partition.interblock_edge_count[:, s]
+        return compute_delta_entropy_sparse(r, s, partition, edge_count_updates, d_out_new, d_in_new)  
+    # else:
+    # t1 = timeit.default_timer()
+    M_r_row = edge_count_updates.block_row
+    M_s_row = edge_count_updates.proposal_row
+    M_r_col = edge_count_updates.block_col
+    M_s_col = edge_count_updates.proposal_col
+    M_r_t1 = partition.interblock_edge_count[r, :]
+    M_s_t1 = partition.interblock_edge_count[s, :]
+    M_t2_r = partition.interblock_edge_count[:, r]
+    M_t2_s = partition.interblock_edge_count[:, s]
+    # print("Indexing time: ", timeit.default_timer() - t1)
 
     # remove r and s from the cols to avoid double counting
     idx = list(range(len(d_in_new)))
@@ -455,8 +492,173 @@ def compute_delta_entropy(r, s, partition: Partition, edge_count_updates: EdgeCo
     delta_entropy += np.sum(M_s_t1 * np.log(M_s_t1.astype(float) / d_in_s_t1 / partition.block_degrees_out[s]))
     delta_entropy += np.sum(M_t2_r * np.log(M_t2_r.astype(float) / d_out_r_col / partition.block_degrees_in[r]))
     delta_entropy += np.sum(M_t2_s * np.log(M_t2_s.astype(float) / d_out_s_col / partition.block_degrees_in[s]))
+    # print("delta entropy calculation time: ", timeit.default_timer() - t1)
+    return delta_entropy
+# End of compute_delta_entropy()
+
+def compute_delta_entropy_sparse(r, s, partition: Partition, edge_count_updates: EdgeCountUpdates, d_out_new,
+    d_in_new) -> float:
+    """Compute change in entropy under the proposal. Reduced entropy means the proposed block is better than the current block.
+
+        Parameters
+        ----------
+        r : int
+                    current block assignment for the node under consideration
+        s : int
+                    proposed block assignment for the node under consideration
+        partition : Partition
+                    the current partitioning results
+        edge_count_updates : EdgeCountUpdates
+                    the updates to the current partition's edge count
+        d_out_new : ndarray (int)
+                    the new out degree of each block under proposal
+        d_in_new : ndarray (int)
+                    the new in degree of each block under proposal
+
+        Returns
+        -------
+        delta_entropy : float
+                    entropy under the proposal minus the current entropy
+
+        Notes
+        -----
+        - M^-: current edge count matrix between the blocks
+        - M^+: new edge count matrix under the proposal
+        - d^-_{t, in}: current in degree of block t
+        - d^-_{t, out}: current out degree of block t
+        - d^+_{t, in}: new in degree of block t under the proposal
+        - d^+_{t, out}: new out degree of block t under the proposal
+        
+        The difference in entropy is computed as:
+        
+        \dot{S} = \sum_{t_1, t_2} {\left[ -M_{t_1 t_2}^+ \text{ln}\left(\frac{M_{t_1 t_2}^+}{d_{t_1, out}^+ d_{t_2, in}^+}\right) + M_{t_1 t_2}^- \text{ln}\left(\frac{M_{t_1 t_2}^-}{d_{t_1, out}^- d_{t_2, in}^-}\right)\right]}
+        
+        where the sum runs over all entries $(t_1, t_2)$ in rows and cols $r$ and $s$ of the edge count matrix
+    """
+    # t1 = timeit.default_timer()
+            # # M_r_row = edge_count_updates.block_row.toarray()
+            # # M_s_row = edge_count_updates.proposal_row.toarray()
+            # # M_r_col = edge_count_updates.block_col.toarray()
+            # # M_s_col = edge_count_updates.proposal_col.toarray()
+            # # M_r_t1 = partition.interblock_edge_count[r, :].toarray()
+            # # M_s_t1 = partition.interblock_edge_count[s, :].toarray()
+            # # M_t2_r = partition.interblock_edge_count[:, r].toarray()
+            # # M_t2_s = partition.interblock_edge_count[:, s].toarray()
+            # M_r_row = edge_count_updates.block_row[:]
+            # # print("MRROW: ", M_r_row)
+            # M_s_row = edge_count_updates.proposal_row[:]
+            # M_r_col = edge_count_updates.block_col
+            # M_s_col = edge_count_updates.proposal_col
+            # M_r_t1 = partition.interblock_edge_count.getrow(r)  # [r]  # .to_matrix()
+            # M_s_t1 = partition.interblock_edge_count.getrow(s)  # [s]  # .to_matrix()
+            # print("Indexing time 1: ", timeit.default_timer() - t1)
+            # M_t2_r = partition.interblock_edge_count.getcol(r)  # [:, r]  # .to_matrix()
+            # M_t2_s = partition.interblock_edge_count.getcol(s)  # [:, s]  # .to_matrix()
+    M_r_row = edge_count_updates.block_row  # .getrow(0)
+    M_s_row = edge_count_updates.proposal_row  # .getrow(0)
+    M_r_col = edge_count_updates.block_col  # .getcol(0)
+    M_s_col = edge_count_updates.proposal_col  # .getcol(0)
+    M_r_t1 = partition.interblock_edge_count.getrow(r)
+    M_s_t1 = partition.interblock_edge_count.getrow(s)
+    # print("Indexing time 1: ", timeit.default_timer() - t1)
+    M_t2_r = partition.interblock_edge_count.getcol(r)
+    M_t2_s = partition.interblock_edge_count.getcol(s)
+    # print("Indexing time: ", timeit.default_timer() - t1)
+
+    idx = list(range(len(d_in_new)))
+    del idx[max(r, s)]
+    del idx[min(r, s)]
+    M_r_col = M_r_col[idx]
+    M_s_col = M_s_col[idx]
+    M_t2_r = M_t2_r[idx]
+    M_t2_s = M_t2_s[idx]
+    d_out_new_ = d_out_new[idx]
+    d_out_ = partition.block_degrees_out[idx]
+
+    # only keep non-zero entries to avoid unnecessary computation
+    d_in_new_r_row = d_in_new[M_r_row.ravel().nonzero()]
+    d_in_new_s_row = d_in_new[M_s_row.ravel().nonzero()]
+    M_r_row = M_r_row[M_r_row.nonzero()]
+    M_s_row = M_s_row[M_s_row.nonzero()]
+    d_out_new_r_col = d_out_new_[M_r_col.ravel().nonzero()]
+    d_out_new_s_col = d_out_new_[M_s_col.ravel().nonzero()]
+    M_r_col = M_r_col[M_r_col.nonzero()]
+    M_s_col = M_s_col[M_s_col.nonzero()]
+    d_in_r_t1 = partition.block_degrees_in[M_r_t1.ravel().nonzero()]
+    d_in_s_t1 = partition.block_degrees_in[M_s_t1.ravel().nonzero()]
+    M_r_t1= M_r_t1[M_r_t1.nonzero()]
+    M_s_t1 = M_s_t1[M_s_t1.nonzero()]
+    d_out_r_col = d_out_[M_t2_r.ravel().nonzero()]
+    d_out_s_col = d_out_[M_t2_s.ravel().nonzero()]
+    M_t2_r = M_t2_r[M_t2_r.nonzero()]
+    M_t2_s = M_t2_s[M_t2_s.nonzero()]
+
+    # sum over the two changed rows and cols
+    delta_entropy = 0
+    delta_entropy -= np.sum(M_r_row * np.log(M_r_row.astype(float) / d_in_new_r_row / d_out_new[r]))
+    delta_entropy -= np.sum(M_s_row * np.log(M_s_row.astype(float) / d_in_new_s_row / d_out_new[s]))
+    delta_entropy -= np.sum(M_r_col * np.log(M_r_col.astype(float) / d_out_new_r_col / d_in_new[r]))
+    delta_entropy -= np.sum(M_s_col * np.log(M_s_col.astype(float) / d_out_new_s_col / d_in_new[s]))
+    delta_entropy += np.sum(M_r_t1 * np.log(M_r_t1.astype(float) / d_in_r_t1 / partition.block_degrees_out[r]))
+    delta_entropy += np.sum(M_s_t1 * np.log(M_s_t1.astype(float) / d_in_s_t1 / partition.block_degrees_out[s]))
+    delta_entropy += np.sum(M_t2_r * np.log(M_t2_r.astype(float) / d_out_r_col / partition.block_degrees_in[r]))
+    delta_entropy += np.sum(M_t2_s * np.log(M_t2_s.astype(float) / d_out_s_col / partition.block_degrees_in[s]))
+    # print("delta entropy calculation time: ", timeit.default_timer() - t1)
     return delta_entropy
 
+            # # remove r and s from the cols to avoid double counting
+            # idx = list(range(len(d_in_new)))
+            # del idx[max(r, s)]
+            # del idx[min(r, s)]
+            # M_r_col = M_r_col.deleterows([r, s])[:].strip()
+            # M_s_col = M_s_col.deleterows([r, s])[:].strip()
+            # M_t2_r = M_t2_r.deleterows([r, s])[:].strip()
+            # M_t2_s = M_t2_s.deleterows([r, s])[:].strip()
+            # # M_t2_r = M_t2_r[idx].strip()
+            # # M_t2_s = M_t2_s[idx].strip()
+            # d_out_new_ = d_out_new[idx]
+            # d_out_ = partition.block_degrees_out[idx]
+
+            # # only keep non-zero entries to avoid unnecessary computation
+            # # d_in_new_r_row = d_in_new[M_r_row.ravel().nonzero()]
+            # # d_in_new_s_row = d_in_new[M_s_row.ravel().nonzero()]
+            # # M_r_row = M_r_row[M_r_row.nonzero()]
+            # # M_s_row = M_s_row[M_s_row.nonzero()]
+            # # d_out_new_r_col = d_out_new_[M_r_col.ravel().nonzero()]
+            # # d_out_new_s_col = d_out_new_[M_s_col.ravel().nonzero()]
+            # # print(len(d_out_new_))
+
+            # d_in_new_r_row = d_in_new[M_r_row.columns[0]]
+            # d_in_new_s_row = d_in_new[M_s_row.columns[0]]
+            # M_r_row = M_r_row.values[0]
+            # M_s_row = M_s_row.values[0]
+            # # print("MRCOL stuff: ", M_r_col.rows, M_r_col.columns, M_r_col.values)
+            # d_out_new_r_col = d_out_new_[np.ravel(M_r_col.rows).astype(int)]
+            # d_out_new_s_col = d_out_new_[np.ravel(M_s_col.rows)]
+            # M_r_col = np.ravel(M_r_col.values)  # [M_r_col.nonzero()]
+            # M_s_col = np.ravel(M_s_col.values)  # [M_s_col.nonzero()]
+            # d_in_r_t1 = partition.block_degrees_in[M_r_t1.columns[0]]  # ().nonzero()]
+            # d_in_s_t1 = partition.block_degrees_in[M_s_t1.columns[0]]  # ravel().nonzero()]
+            # M_r_t1= M_r_t1.values[0]  # [M_r_t1.nonzero()]
+            # M_s_t1 = M_s_t1.values[0]  # [M_s_t1.nonzero()]
+            # d_out_r_col = d_out_[np.ravel(M_t2_r.rows)]
+            # d_out_s_col = d_out_[np.ravel(M_t2_s.rows)]  # avel().nonzero()]
+            # M_t2_r = np.ravel(M_t2_r.values)  # [M_t2_r.nonzero()]
+            # M_t2_s = np.ravel(M_t2_s.values)  # [M_t2_s.nonzero()]
+
+    # sum over the two changed rows and cols
+    # delta_entropy = 0
+    # delta_entropy -= np.sum(M_r_row * np.log(M_r_row / d_in_new_r_row / d_out_new[r]))
+    # delta_entropy -= np.sum(M_s_row * np.log(M_s_row / d_in_new_s_row / d_out_new[s]))
+    # delta_entropy -= np.sum(M_r_col * np.log(M_r_col / d_out_new_r_col / d_in_new[r]))
+    # delta_entropy -= np.sum(M_s_col * np.log(M_s_col / d_out_new_s_col / d_in_new[s]))
+    # delta_entropy += np.sum(M_r_t1 * np.log(M_r_t1 / d_in_r_t1 / partition.block_degrees_out[r]))
+    # delta_entropy += np.sum(M_s_t1 * np.log(M_s_t1 / d_in_s_t1 / partition.block_degrees_out[s]))
+    # delta_entropy += np.sum(M_t2_r * np.log(M_t2_r / d_out_r_col / partition.block_degrees_in[r]))
+    # delta_entropy += np.sum(M_t2_s * np.log(M_t2_s / d_out_s_col / partition.block_degrees_in[s]))
+    # print("delta entropy calculation time: ", timeit.default_timer() - t1)
+    # return delta_entropy
+# End of compute_delta_entropy_sparse()
 
 def carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_block, partition: Partition) -> Partition:
     """Execute the best merge (agglomerative) moves to reduce a set number of blocks

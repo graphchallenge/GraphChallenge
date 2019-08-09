@@ -9,6 +9,7 @@ import numpy as np
 from scipy import sparse as sparse
 
 from graph import Graph
+from dictmatrix import DictMatrix
 
 class Partition():
     """Stores the current partitioning results.
@@ -75,7 +76,8 @@ class Partition():
             Compute the edge count matrix and the block degrees from scratch
         """
         if use_sparse: # store interblock edge counts as a sparse matrix
-            self.interblock_edge_count = sparse.lil_matrix((self.num_blocks, self.num_blocks), dtype=int)
+            # self.interblock_edge_count = sparse.lil_matrix((self.num_blocks, self.num_blocks), dtype=int)
+            self.interblock_edge_count = DictMatrix(shape=(self.num_blocks, self.num_blocks))
         else:
             self.interblock_edge_count = np.zeros((self.num_blocks, self.num_blocks), dtype=int)
         # compute the initial interblock edge count
@@ -84,7 +86,10 @@ class Partition():
                 k1 = self.block_assignment[v]
                 k2, inverse_idx = np.unique(self.block_assignment[out_neighbors[v][:, 0]], return_inverse=True)
                 count = np.bincount(inverse_idx, weights=out_neighbors[v][:, 1]).astype(int)
-                self.interblock_edge_count[k1, k2] += count
+                if use_sparse:
+                    self.interblock_edge_count.add((k1, k2), count)
+                else:
+                    self.interblock_edge_count[k1, k2] += count
         # compute initial block degrees
         self.block_degrees_out = np.asarray(self.interblock_edge_count.sum(axis=1)).ravel()
         self.block_degrees_in = np.asarray(self.interblock_edge_count.sum(axis=0)).ravel()

@@ -6,7 +6,8 @@ from typing import Tuple
 import numpy as np
 
 from partition_baseline_support import propose_new_partition
-from partition_baseline_support import compute_new_rows_cols_interblock_edge_count_matrix
+# from partition_baseline_support import compute_new_rows_cols_interblock_edge_count_matrix
+from partition_baseline_support import block_merge_edge_count_updates
 from partition_baseline_support import compute_new_block_degrees
 from partition_baseline_support import compute_delta_entropy
 from partition_baseline_support import carry_out_best_merges
@@ -46,6 +47,8 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
     block_partition = range(partition.num_blocks)
     block_merge_timings.t_initialization()
 
+    import timeit
+    t1 = timeit.default_timer()
     for current_block in range(partition.num_blocks):  # evaluate agglomerative updates for each block
         for _ in range(num_agg_proposals_per_block):
             proposal, delta_entropy = propose_merge(current_block, partition, use_sparse_matrix, block_partition,
@@ -55,17 +58,21 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
                 best_merge_for_each_block[current_block] = proposal
                 delta_entropy_for_each_block[current_block] = delta_entropy
             block_merge_timings.t_acceptance()
+            # print("accept/reject merge: ", timeit.default_timer() - t1)
+    print("propose merge: ", timeit.default_timer() - t1)
 
     # carry out the best merges
     block_merge_timings.t_merging()
     partition = carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_block, partition)
     block_merge_timings.t_merging()
+    print("carry out merges: ", timeit.default_timer() - t1)
 
     # re-initialize edge counts and block degrees
     block_merge_timings.t_re_counting_edges()
     partition.initialize_edge_counts(out_neighbors, use_sparse_matrix)
     block_merge_timings.t_re_counting_edges()
-    
+    print("initialize edge counts: ", timeit.default_timer() - t1)
+    exit()
     return partition
 # End of merge_blocks()
 
@@ -108,11 +115,16 @@ def propose_merge(current_block: int, partition: Partition, use_sparse_matrix: b
 
     # compute the two new rows and columns of the interblock edge count matrix
     block_merge_timings.t_edge_count_updates()
-    edge_count_updates = compute_new_rows_cols_interblock_edge_count_matrix(partition.interblock_edge_count, current_block, proposal,
+    edge_count_updates = block_merge_edge_count_updates(partition.interblock_edge_count, current_block, proposal,
                                                         out_blocks[:, 0], out_blocks[:, 1], in_blocks[:, 0],
                                                         in_blocks[:, 1],
                                                         partition.interblock_edge_count[current_block, current_block],
-                                                        1, use_sparse_matrix)
+                                                        use_sparse_matrix)
+    # edge_count_updates = compute_new_rows_cols_interblock_edge_count_matrix(partition.interblock_edge_count, current_block, proposal,
+    #                                                     out_blocks[:, 0], out_blocks[:, 1], in_blocks[:, 0],
+    #                                                     in_blocks[:, 1],
+    #                                                     partition.interblock_edge_count[current_block, current_block],
+    #                                                     1, use_sparse_matrix)
     block_merge_timings.t_edge_count_updates()
 
     # compute new block degrees
@@ -152,9 +164,9 @@ def outgoing_edges(adjacency_matrix: np.array, block: int, use_sparse_matrix: bo
                 matrix with two columns, representing the edge (as the other block's ID), and the weight of the edge
     """
     if use_sparse_matrix:
-        out_blocks = adjacency_matrix[block, :].nonzero()[1]
-        out_blocks = np.hstack((out_blocks.reshape([len(out_blocks), 1]),
-                                adjacency_matrix[block, out_blocks].toarray().transpose()))
+        out_blocks = adjacency_matrix.getrow(block)  # .reshape((adjacency_matrix.ncols, 1))  # values
+        out_blocks_nonzero = out_blocks.nonzero()[0]  # indices
+        out_blocks = np.vstack((out_blocks_nonzero, out_blocks[out_blocks_nonzero])).T  # np.transpose([out_blocks_nonzero[0]]), np.transpose([out_blocks[out_blocks_nonzero]])))
     else:
         out_blocks = adjacency_matrix[block, :].nonzero()
         out_blocks = np.hstack((np.array(out_blocks).transpose(), adjacency_matrix[block, out_blocks].transpose()))
@@ -179,9 +191,22 @@ def incoming_edges(adjacency_matrix: np.array, block: int, use_sparse_matrix: bo
                 matrix with two columns, representing the edge (as the other block's ID), and the weight of the edge
     """
     if use_sparse_matrix:
-        in_blocks = adjacency_matrix[:, block].nonzero()[0]
-        in_blocks = np.hstack(
-            (in_blocks.reshape([len(in_blocks), 1]), adjacency_matrix[in_blocks, block].toarray()))
+        in_blocks = adjacency_matrix.getcol(block)
+        in_blocks_nonzero = in_blocks.nonzero()[0]
+        # print(in_blocks)
+        # print(in_blocks_nonzero)
+        # print(len(np.array(in_blocks_nonzero).transpose()))
+        # print(len(in_blocks[in_blocks_nonzero].transpose()))
+        in_blocks = np.vstack((in_blocks_nonzero, in_blocks[in_blocks_nonzero])).T
+        # in_blocks = np.hstack((np.array(in_blocks_nonzero).transpose(), in_blocks[in_blocks_nonzero].transpose()))
+                # in_blocks = adjacency_matrix[:, block].strip()
+                # # print("in_blocks: ", in_blocks.rows, in_blocks.values)
+                # in_blocks = np.hstack((in_blocks.rows, in_blocks.values))
+        # print("in_blocks: ", in_blocks)
+        # exit()
+        # in_blocks = adjacency_matrix[:, block].nonzero()[0]
+        # in_blocks = np.hstack(
+            # (in_blocks.reshape([len(in_blocks), 1]), adjacency_matrix[in_blocks, block].toarray()))
     else:
         in_blocks = adjacency_matrix[:, block].nonzero()
         in_blocks = np.hstack((np.array(in_blocks).transpose(), adjacency_matrix[in_blocks, block].transpose()))
