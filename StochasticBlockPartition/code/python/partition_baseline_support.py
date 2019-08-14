@@ -86,11 +86,14 @@ def propose_new_partition(r, neighbors_out, neighbors_in, b, partition: Partitio
         s = propose_random_block(r, partition.num_blocks, agg_move)
     else:  # propose by random draw from neighbors of block partition[rand_neighbor]
         if use_sparse:
-            multinomial_prob = (partition.interblock_edge_count.getrow(u) + partition.interblock_edge_count.getcol(u) / float(partition.block_degrees[u]))
-            # print("multinomial prob: ", multinomial_prob)
-            multinomial_prob = (partition.interblock_edge_count[u, :].toarray().transpose() + partition.interblock_edge_count[:, u].toarray()) / float(partition.block_degrees[u])
-            # print("multinomial prob: ", multinomial_prob)
-            # exit()
+            multinomial_prob = (partition.interblock_edge_count.getrow(u).astype(float) + partition.interblock_edge_count.getcol(u).astype(float)) / float(partition.block_degrees[u])
+            # multinomial_prob = np.asarray([multinomial_prob]).T
+            # multinomial_prob_old = (partition.interblock_edge_count[u, :].toarray().transpose() + partition.interblock_edge_count[:, u].toarray()) / float(partition.block_degrees[u])
+            # row = partition.interblock_edge_count.getcol(u)
+            # rowold = partition.interblock_edge_count[:, u].toarray()
+            # for i in range(len(multinomial_prob)):
+            #     if row[i] != rowold[i]:
+            #         print("r: {} i: {} new: {} old: {}".format(r, i, row[i], rowold[i]))
         else:
             multinomial_prob = (partition.interblock_edge_count[u, :].transpose() + partition.interblock_edge_count[:, u]) / float(partition.block_degrees[u])
         if agg_move:  # force proposal to be different from current block
@@ -103,7 +106,17 @@ def propose_new_partition(r, neighbors_out, neighbors_in, b, partition: Partitio
             else:
                 multinomial_prob = multinomial_prob / multinomial_prob.sum()
         candidates = multinomial_prob.nonzero()[0]
-        s = candidates[np.flatnonzero(np.random.multinomial(1, multinomial_prob[candidates].ravel()))[0]]
+        # print("sum = ", np.sum(multinomial_prob))
+        try:
+            s = candidates[np.flatnonzero(np.random.multinomial(1, multinomial_prob[candidates].ravel()))[0]]
+        except ValueError as e:
+            print(e)
+            print("sum = ", np.sum(multinomial_prob))
+            print("getters: ", sum(partition.interblock_edge_count.getrow(u) + partition.interblock_edge_count.getcol(u)), partition.interblock_edge_count.getrow(u) + partition.interblock_edge_count.getcol(u))
+            print("indexers: ", np.sum(partition.interblock_edge_count[u, :].toarray().transpose() + partition.interblock_edge_count[:, u].toarray()), partition.interblock_edge_count[u, :].toarray().transpose() + partition.interblock_edge_count[:, u].toarray())
+            # print("getcol: ", sum(partition.interblock_edge_count.getcol(u)), partition.interblock_edge_count.getcol(u))
+            # print("indexcol: ", np.sum(partition.interblock_edge_count[:, u].toarray()), partition.interblock_edge_count[:, u].toarray())
+            exit()
     # print("k_out: {} k_in: {} k: {}".format(k_out, k_in, k))
     return s, k_out, k_in, k
 
