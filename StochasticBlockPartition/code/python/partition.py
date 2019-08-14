@@ -9,7 +9,7 @@ import numpy as np
 from scipy import sparse as sparse
 
 from graph import Graph
-from dictmatrix import DictMatrix
+from utils.dictmatrix import DictMatrix
 
 class Partition():
     """Stores the current partitioning results.
