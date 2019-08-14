@@ -4,7 +4,7 @@
 from typing import Tuple, List, Callable
 
 from munkres import Munkres # for correctness evaluation
-import scipy.misc as misc
+import scipy.special as misc
 import numpy as np
 
 from evaluation import Evaluation

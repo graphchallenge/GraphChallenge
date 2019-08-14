@@ -47,8 +47,6 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
     block_partition = range(partition.num_blocks)
     block_merge_timings.t_initialization()
 
-    import timeit
-    t1 = timeit.default_timer()
     for current_block in range(partition.num_blocks):  # evaluate agglomerative updates for each block
         for _ in range(num_agg_proposals_per_block):
             proposal, delta_entropy = propose_merge(current_block, partition, use_sparse_matrix, block_partition,
@@ -58,21 +56,17 @@ def merge_blocks(partition: Partition, num_agg_proposals_per_block: int, use_spa
                 best_merge_for_each_block[current_block] = proposal
                 delta_entropy_for_each_block[current_block] = delta_entropy
             block_merge_timings.t_acceptance()
-            # print("accept/reject merge: ", timeit.default_timer() - t1)
-    print("propose merge: ", timeit.default_timer() - t1)
 
     # carry out the best merges
     block_merge_timings.t_merging()
     partition = carry_out_best_merges(delta_entropy_for_each_block, best_merge_for_each_block, partition)
     block_merge_timings.t_merging()
-    print("carry out merges: ", timeit.default_timer() - t1)
 
     # re-initialize edge counts and block degrees
     block_merge_timings.t_re_counting_edges()
     partition.initialize_edge_counts(out_neighbors, use_sparse_matrix)
     block_merge_timings.t_re_counting_edges()
-    print("initialize edge counts: ", timeit.default_timer() - t1)
-    exit()
+
     return partition
 # End of merge_blocks()
 
@@ -129,6 +123,7 @@ def propose_merge(current_block: int, partition: Partition, use_sparse_matrix: b
 
     # compute new block degrees
     block_merge_timings.t_block_degree_updates()
+    # print("k_out: {} k_in: {} k: {}".format(num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges))
     block_degrees_out_new, block_degrees_in_new, block_degrees_new = compute_new_block_degrees(current_block,
                                                                                             proposal,
                                                                                             partition,

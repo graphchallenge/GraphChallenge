@@ -10,6 +10,7 @@ import numpy as np
 from partition_baseline_support import compute_overall_entropy
 from partition_baseline_support import propose_new_partition
 from partition_baseline_support import compute_new_rows_cols_interblock_edge_count_matrix
+from partition_baseline_support import vertex_reassign_edge_count_updates
 from partition_baseline_support import compute_new_block_degrees
 from partition_baseline_support import compute_Hastings_correction
 from partition_baseline_support import compute_delta_entropy
@@ -139,12 +140,15 @@ def propose_new_assignment(current_node: int, partition: Partition, graph: Graph
     in_neighbors = graph.in_neighbors[current_node]
     mcmc_timings.t_indexing()
 
+    # import timeit
+    # t1 = timeit.default_timer()
     # propose a new block for this node
     mcmc_timings.t_proposal()
     proposal, num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges = propose_new_partition(
         current_block, out_neighbors, in_neighbors, partition.block_assignment, partition, False, args.sparse)
     mcmc_timings.t_proposal()
     did_move = False  # Has the graph node been moved to another block or not?
+    # print("propose vertex move: ", timeit.default_timer() - t1)
 
     # determine whether to accept or reject the proposal
     if (proposal != current_block):
@@ -160,16 +164,18 @@ def propose_new_assignment(current_node: int, partition: Partition, graph: Graph
         mcmc_timings.t_edge_count_updates()
         self_edge_weight = np.sum(out_neighbors[np.where(
             out_neighbors[:, 0] == current_node), 1])  # check if this node has a self edge
-        edge_count_updates = compute_new_rows_cols_interblock_edge_count_matrix(partition.interblock_edge_count, current_block, proposal,
-                                                            blocks_out, count_out, blocks_in, count_in,
-                                                            self_edge_weight, 0, args.sparse)
+        edge_count_updates = vertex_reassign_edge_count_updates(partition.interblock_edge_count, current_block, proposal,
+                                                                blocks_out, count_out, blocks_in, count_in,
+                                                                self_edge_weight, args.sparse)
         mcmc_timings.t_edge_count_updates()
+        # print("edge count updates: ", timeit.default_timer() - t1)
 
         # compute new block degrees
         mcmc_timings.t_block_degree_updates()
         block_degrees_out_new, block_degrees_in_new, block_degrees_new = compute_new_block_degrees(
             current_block, proposal, partition, num_out_neighbor_edges, num_in_neighbor_edges, num_neighbor_edges)
         mcmc_timings.t_block_degree_updates()
+        # print("compute block degrees: ", timeit.default_timer() - t1)
 
         # compute the Hastings correction
         mcmc_timings.t_hastings_correction()
@@ -181,12 +187,14 @@ def propose_new_assignment(current_node: int, partition: Partition, graph: Graph
         else: # if the node is an island, proposal is random and symmetric
             Hastings_correction = 1
         mcmc_timings.t_hastings_correction()
+        # print("compute hastings correction: ", timeit.default_timer() - t1)
 
         # compute change in entropy / posterior
         mcmc_timings.t_compute_delta_entropy()
         delta_entropy = compute_delta_entropy(current_block, proposal, partition, edge_count_updates, 
                                             block_degrees_out_new, block_degrees_in_new, args.sparse)
         mcmc_timings.t_compute_delta_entropy()
+        # print("compute delta entropy: ", timeit.default_timer() - t1)
 
         # compute probability of acceptance
         mcmc_timings.t_acceptance()
@@ -197,9 +205,11 @@ def propose_new_assignment(current_node: int, partition: Partition, graph: Graph
                                             args.sparse)
             did_move = True
         mcmc_timings.t_acceptance()
+        # print("accept/reject: ", timeit.default_timer() - t1)
         return delta_entropy, did_move
     else:
         mcmc_timings.zeros()
+        # print("accept/reject: ", timeit.default_timer() - t1)
         return -1.0, did_move
 # End of reassign_node()
 
