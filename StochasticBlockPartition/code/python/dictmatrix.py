@@ -5,6 +5,8 @@ from sortedcontainers import SortedDict
 import scipy.sparse as sparse
 import numpy as np
 
+from edge_count_updates import EdgeCountUpdates
+
 Values = List[Union[Any, List[Any]]]
 Columns = List[Union[int, List[int]]]
 Index = Union[int, slice, Iterable, Tuple]
@@ -585,11 +587,11 @@ class DictMatrix(object):
             result = 0.0
             for row in self._matrix:
                 result += sum(row.values())
-        elif axis == 0:
+        elif axis == 1:  # sum across rows
             result = list()  # type: List[float]
             for row in self._matrix:
                 result.append(sum(row.values()))
-        elif axis == 1:
+        elif axis == 0:  # sum across columns
             result = [0.0] * self.ncols
             for row in self._matrix:
                 for column, value in row.items():
@@ -624,6 +626,81 @@ class DictMatrix(object):
                 result[row] = rowdict[col]
         return result
     # End of getcol()
+
+    def nonzero(self) -> Tuple[List[int], List[int]]:
+        """Returns the row and column indices of all nonzero elements in the matrix.
+
+            Returns
+            -------
+            rows : List[int]
+                The row indices of the non-zero elements
+            columns : List[int]
+                The column indices of the non-zero elements
+        """
+        rows = list()  # type: List[int]
+        columns = list()  # type: List[int]
+        for row_index in range(self.nrows):
+            row = self._matrix[row_index]
+            rows.extend([row_index] * len(row))
+            columns.extend(row.keys())
+        return rows, columns
+    # End of nonzero()
+
+    def values(self) -> List[int]:
+        """Returns the non-zero values of this matrix.
+
+            Returns
+            -------
+            values : List[int]
+                The non-zero values in this matrix
+        """
+        result = list()  # type: List[int]
+        for row in self._matrix:
+            result.extend(row.values())
+        return result
+    # End of values()
+
+    def update_edge_counts(self, current_block: int, proposed_block: int, edge_count_updates: EdgeCountUpdates):
+        """Updates the edge counts for the current and proposed blocks.
+
+            Parameters
+            ---------
+            current_block : int
+                the current block
+            proposed_block : int
+                the proposed block
+            edge_count_updates : EdgeCountUpdates
+                the updates to apply
+        """
+        self._matrix[current_block] = SortedDict()
+        self._matrix[proposed_block] = SortedDict()
+        for col in range(len(edge_count_updates.block_row)):
+            r_value = edge_count_updates.block_row[col]
+            s_value = edge_count_updates.proposal_row[col]
+            if r_value != 0: self._matrix[current_block][col] = r_value
+            if s_value != 0: self._matrix[proposed_block][col] = s_value
+        for index in range(self.nrows):
+            row = self._matrix[index]
+            r_value = edge_count_updates.block_col[index]
+            s_value = edge_count_updates.proposal_col[index]
+            if r_value != 0:
+                row[current_block] = r_value
+            else:
+                if current_block in row: row.pop(current_block)
+            if s_value != 0:
+                row[proposed_block] = s_value
+            else:
+                if proposed_block in row: row.pop(proposed_block)
+    # End of update_edge_counts()
+
+    def copy(self):
+        """Returns a copy of this matrix.
+        """
+        mat_copy = DictMatrix(shape=self.shape)
+        for index in range(mat_copy.nrows):
+            mat_copy._matrix[index] = self._matrix[index].copy()
+        return mat_copy
+    # End of copy()
 # End of DictMatrix()
 
 if __name__ == "__main__":
