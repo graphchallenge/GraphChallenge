@@ -24,11 +24,11 @@ if use_graph_tool_options:
     import graph_tool.all as gt
 
 from partition import Partition, PartitionTriplet
-from dictmatrix import DictMatrix
-from edge_count_updates import EdgeCountUpdates
+from utils.sparse_matrix import SparseMatrix
+from utils.edge_count_updates import EdgeCountUpdates
 
 
-Matrix = Union[np.ndarray, DictMatrix, sparse.lil_matrix]
+Matrix = Union[np.ndarray, SparseMatrix, sparse.lil_matrix]
 
 
 def propose_new_partition(r, neighbors_out, neighbors_in, b, partition: Partition, agg_move, use_sparse):

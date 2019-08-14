@@ -5,97 +5,12 @@ from sortedcontainers import SortedDict
 import scipy.sparse as sparse
 import numpy as np
 
-from edge_count_updates import EdgeCountUpdates
-
-Values = List[Union[Any, List[Any]]]
-Columns = List[Union[int, List[int]]]
-Index = Union[int, slice, Iterable, Tuple]
-Number = (int, np.int64, np.int32, np.int16, np.int)
-Array = (List, Iterable)
+# from edge_count_updates import EdgeCountUpdates
+from utils.sparse_matrix import SparseMatrix, IndexResult, Number, Index, Values, Array, Columns
+from utils.edge_count_updates import EdgeCountUpdates
 
 
-
-class IndexResult(object):
-    def __init__(self, values: Values, rows: Columns, columns: Columns, master_shape: Tuple[int, int]) -> None:
-        self.values = values
-        self.rows = rows
-        self.columns = columns
-        self.shape = master_shape
-    # End of __init__()
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, IndexResult):
-            return False
-        return (self.values, self.rows, self.columns, self.shape) == (other.values, other.rows, other.columns, self.shape)
-    # End of __eq__()
-
-    def strip(self) -> 'IndexResult':
-        """Strips empty rows from a result with multiple rows."""
-        values = list()
-        rows = list()
-        columns = list()
-        if self.values and isinstance(self.values[0], List):
-            for row in range(len(self.values)):
-                if self.values[row]:
-                    values.append(self.values[row])
-                    rows.append(self.rows[row])
-                    columns.append(self.columns[row])
-            return IndexResult(values, rows, columns, self.shape)
-        else:
-            return self
-    # End of strip()
-
-    def to_matrix(self) -> 'DictMatrix':
-        """Creates a DictMatrix out of the indexing result.
-        """
-        return DictMatrix(values=self)
-    # End of to_matrix()
-
-    def to_array(self) -> np.ndarray:
-        """Converts the values held therein into an array.
-        """
-        return np.asarray(self.values)
-    # End of to_array()
-
-    def toarray(self) -> np.ndarray:
-        """Traditional, sparse-vector-to-dense-vector-style array conversion.
-        """
-        if self.shape[0] == 1:
-            array = np.zeros(self.shape)
-            for value, column in zip(self.values, self.columns):
-                array[0,column] = value
-        elif self.shape[1] == 1:
-            array = np.zeros(self.shape)
-            for value, row in zip(self.values, self.rows):
-                array[row,0] = value
-        else:
-            raise NotImplementedError("This function is only implemented for 1D arrays")
-        return array
-    # End of toarray()
-
-    def delete(self, rows: List[int]) -> 'IndexResult':
-        """Sets the given rows to be empty.
-        """
-        for row in rows:
-            del self.rows[row]
-            del self.columns[row]
-            del self.values[row]
-            # self.rows[row] = list()
-            # self.columns[row] = list()
-            # self.values[row] = list()
-        return self
-    # End of delete()
-
-    @staticmethod
-    def empty(master_shape: Tuple[int, int] = (0,0)) -> 'IndexResult':
-        """Creates an empty IndexResult.
-        """
-        return IndexResult(list(), list(), list(), master_shape)
-    # End of empty()
-# End of IndexResult()
-
-
-class DictMatrix(object):
+class DictMatrix(SparseMatrix):
     """Stores a matrix as a list of dictionaries, where each dictionary represents the non-zero values in a row.
     """
 
@@ -576,7 +491,7 @@ class DictMatrix(object):
             ---------
             axis : Union[int, None]
                 the axis along which to sum the matrix. Default = None. If None, sums all the values in the matrix.
-                If 0, sums the values along each row. If 1, sums the values along each column.
+                If 0, sums the values along each column. If 1, sums the values along each row.
 
             Returns
             -------
@@ -693,8 +608,13 @@ class DictMatrix(object):
                 if proposed_block in row: row.pop(proposed_block)
     # End of update_edge_counts()
 
-    def copy(self):
+    def copy(self) -> 'DictMatrix':
         """Returns a copy of this matrix.
+
+            Returns
+            -------
+            mat_copy : DictMatrix
+                a copy of this matrix
         """
         mat_copy = DictMatrix(shape=self.shape)
         for index in range(mat_copy.nrows):
