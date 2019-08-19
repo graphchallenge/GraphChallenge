@@ -6,8 +6,8 @@ import scipy.sparse as sparse
 import numpy as np
 
 # from edge_count_updates import EdgeCountUpdates
-from utils.sparse_matrix import SparseMatrix, IndexResult, Number, Index, Values, Array, Columns
-from utils.edge_count_updates import EdgeCountUpdates
+from .sparse_matrix import SparseMatrix, IndexResult, Number, Index, Values, Array, Columns
+from .edge_count_updates import EdgeCountUpdates
 
 
 class DictMatrix(SparseMatrix):
