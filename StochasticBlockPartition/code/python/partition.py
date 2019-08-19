@@ -9,7 +9,7 @@ import numpy as np
 from scipy import sparse as sparse
 
 from graph import Graph
-from utils.dictmatrix import DictMatrix
+from utils.dict_transpose_matrix import DictTransposeMatrix
 
 class Partition():
     """Stores the current partitioning results.
@@ -77,7 +77,7 @@ class Partition():
         """
         if use_sparse: # store interblock edge counts as a sparse matrix
             # self.interblock_edge_count = sparse.lil_matrix((self.num_blocks, self.num_blocks), dtype=int)
-            self.interblock_edge_count = DictMatrix(shape=(self.num_blocks, self.num_blocks))
+            self.interblock_edge_count = DictTransposeMatrix(shape=(self.num_blocks, self.num_blocks))
         else:
             self.interblock_edge_count = np.zeros((self.num_blocks, self.num_blocks), dtype=int)
         # compute the initial interblock edge count
