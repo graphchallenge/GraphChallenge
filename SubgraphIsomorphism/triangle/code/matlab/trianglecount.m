@@ -31,9 +31,9 @@ if exist(inc_mtx_file, 'file')
     t0 = clock;
     B = sparse(a(:,1), a(:,2), a(:,3));
     t_create_inc = etime(clock, t0);
-    fprintf('adjacency matrix create time : %f seconds \n', t_create_inc);    
+    fprintf('incidence matrix create time : %f seconds \n', t_create_inc);    
 else
-    error('Unable to read adjacency matrix');
+    error('Unable to read incidence matrix');
 end
 
 % count triangles
