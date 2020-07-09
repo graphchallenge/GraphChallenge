@@ -1,37 +1,34 @@
-function calcx(E, m, n, k)
-    tmp = E.'*E;
-    R = E * ( tmp - spdiagm( diag(tmp) ) );
-    r,c,v = findnz(R);
-    id = v.==2;
-    A = sparse( r[id], c[id], 1, m, n);
-    s = sum(A, 2);
-    x = s .< (k-2);    
-    return(x, !x);
+function calcx(Et, k)
+    n, m = size(Et)
+    tmp = Et*Et'
+    Rt = ( tmp - Diagonal( diag(tmp) ) )*Et
+    s = vec(sum(t -> t == 2, Rt, 1))
+    x = find(t -> t < (k - 2), s)
+    return x
 end
 
-function ktruss(inc_mtx_file, k)
-    if ~isfile( inc_mtx_file )
-        println("unable to open input file");
-        return (-1);
+function ktruss(inc_mtx_file, k; time = true)
+    if !isfile( inc_mtx_file )
+        println("unable to open input file")
+        return (-1)
     end
 
-    # load input data       
-    t_read_inc=@elapsed ii = readdlm( inc_mtx_file, '\t', Int64);
-    println("incidence matrix read time : ", t_read_inc);
+    # load input data
+    t_read_inc = @elapsed ii = readdlm( inc_mtx_file, '\t', Int64)
+    time && println("incidence matrix read time : ", t_read_inc)
 
-    t_create_inc=@elapsed E = sparse( ii[:,1], ii[:,2], ii[:,3] );
-    println("sparse adj. matrix creation time : ", t_create_inc);
+    t_create_inc = @elapsed Et = sparse( ii[:,2], ii[:,1], ii[:,3] )
+    time && println("sparse adj. matrix creation time : ", t_create_inc)
 
-    #
-    tic();
-    m,n = size(E);
-    x, xc = calcx(E, m, n, k);
-    while sum(xc) != sum( any(E,2) )
-        E[find(x), :] = 0
-        x, xc = calcx(E, m, n, k);
+    time && tic()
+    m = size(Et, 2)
+    x = calcx(Et, k)
+    while (m - length(x)) != sum( any(Et,1) )
+        Et[:, x] = 0
+        x = calcx(Et, k)
     end
-    
-    return E
+    time && toc()
+    return Et'
 end
 
 
